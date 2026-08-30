@@ -232,14 +232,26 @@ import Layout from '../layouts/Layout.astro';
     :global(.task-card:hover) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
     :global(.task-card.dragging) { opacity: 0.45; transform: scale(0.95); }
 
-    :global(.task-card[data-status="todo"])  { background: #dc2626; }
-    :global(.task-card[data-status="doing"]) { background: #ca8a04; }
-    :global(.task-card[data-status="done"])  { background: #16a34a; }
+    :global(.task-card[data-status="todo"]) {
+      background: rgba(220, 50, 50, 0.18);
+      border: 1px solid rgba(220, 50, 50, 0.4);
+      border-left: 3px solid #e05555;
+    }
+    :global(.task-card[data-status="doing"]) {
+      background: rgba(200, 140, 0, 0.18);
+      border: 1px solid rgba(200, 140, 0, 0.4);
+      border-left: 3px solid #e6a800;
+    }
+    :global(.task-card[data-status="done"]) {
+      background: rgba(40, 180, 100, 0.18);
+      border: 1px solid rgba(40, 180, 100, 0.4);
+      border-left: 3px solid #28b464;
+    }
 
     :global(.task-text) {
       font-size: 0.9rem;
-      font-weight: 600;
-      color: #fff;
+      font-weight: 500;
+      color: var(--ink);
       word-break: break-word;
       line-height: 1.45;
       margin: 0;
