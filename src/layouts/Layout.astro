@@ -31,7 +31,7 @@ const path = Astro.url.pathname;
           <span class="brand-mark">✦</span>
           <span class="brand-text">
             <span class="brand-line1">CENTRO DE MANDO</span>
-            <span class="brand-line2">Alexandra · Equipo de cohetería</span>
+            <span class="brand-line2" id="brand-name">Centro de Mando</span>
           </span>
         </a>
         <nav class="nav" aria-label="Navegación principal">
@@ -62,38 +62,79 @@ const path = Astro.url.pathname;
       </div>
     </div>
 
+    <!-- Name prompt modal -->
+    <div id="name-modal" class="name-modal hidden">
+      <div class="name-card panel">
+        <span class="eyebrow">Bienvenido/a</span>
+        <h2>¿Cómo te llamas?</h2>
+        <p class="auth-copy">Este nombre aparecerá en tu Centro de Mando.</p>
+        <form id="name-form" class="auth-form">
+          <input id="name-input" type="text" placeholder="Tu nombre" required autocomplete="name" />
+          <button type="submit" class="btn btn-flame">Guardar y entrar</button>
+        </form>
+      </div>
+    </div>
+
     <main class="wrap main hidden" id="app-content">
       <slot />
     </main>
 
     <script>
       import { supabase, isSupabaseConfigured } from '../lib/supabase';
+      import { getItem, setItem } from '../lib/store';
 
-      const gate = document.getElementById('auth-gate')!;
-      const content = document.getElementById('app-content')!;
+      const gate      = document.getElementById('auth-gate')!;
+      const content   = document.getElementById('app-content')!;
       const logoutBtn = document.getElementById('logout-btn')!;
-      const form = document.getElementById('auth-form') as HTMLFormElement;
-      const statusEl = document.getElementById('auth-status')!;
+      const form      = document.getElementById('auth-form') as HTMLFormElement;
+      const statusEl  = document.getElementById('auth-status')!;
+      const nameModal = document.getElementById('name-modal')!;
+      const nameForm  = document.getElementById('name-form') as HTMLFormElement;
+      const brandName = document.getElementById('brand-name')!;
+
+      async function loadAndSetName() {
+        const profile = await getItem<{ name: string } | null>('acm.profile', null);
+        if (profile?.name) {
+          brandName.textContent = `${profile.name} · Centro de Mando`;
+        } else {
+          // account exists but no name set — show name modal
+          nameModal.classList.remove('hidden');
+        }
+      }
+
+      async function saveName(name: string) {
+        await setItem('acm.profile', { name });
+        brandName.textContent = `${name} · Centro de Mando`;
+        nameModal.classList.add('hidden');
+      }
+
+      nameForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = (document.getElementById('name-input') as HTMLInputElement).value.trim();
+        if (!name) return;
+        await saveName(name);
+      });
 
       function showApp() {
         gate.classList.add('hidden');
         content.classList.remove('hidden');
         logoutBtn.classList.remove('hidden');
         window.dispatchEvent(new CustomEvent('acm:auth', { detail: { authenticated: true } }));
+        loadAndSetName();
       }
 
       function showGate(message?: string) {
         content.classList.add('hidden');
         gate.classList.remove('hidden');
+        nameModal.classList.add('hidden');
         logoutBtn.classList.add('hidden');
+        brandName.textContent = 'Centro de Mando';
         if (message) statusEl.textContent = message;
         window.dispatchEvent(new CustomEvent('acm:auth', { detail: { authenticated: false } }));
       }
 
       if (!isSupabaseConfigured) {
-        showGate(
-          'Supabase todavía no está configurado en este sitio (faltan PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY).'
-        );
+        showGate('Supabase todavía no está configurado (faltan PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY).');
         form.querySelector('button')!.setAttribute('disabled', 'true');
       } else {
         supabase.auth.getSession().then(({ data }) => {
@@ -107,40 +148,44 @@ const path = Astro.url.pathname;
         });
 
         let isSignUp = false;
+        let pendingName = false;
 
-        const title = document.getElementById('auth-title')!;
-        const submitBtn = document.getElementById('auth-submit')!;
-        const toggleBtn = document.getElementById('auth-toggle')!;
+        const title       = document.getElementById('auth-title')!;
+        const submitBtn   = document.getElementById('auth-submit')!;
+        const toggleBtn   = document.getElementById('auth-toggle')!;
         const toggleLabel = document.getElementById('auth-toggle-label')!;
         const passwordInput = document.getElementById('auth-password') as HTMLInputElement;
 
         toggleBtn.addEventListener('click', () => {
           isSignUp = !isSignUp;
-          title.textContent = isSignUp ? 'Crear cuenta' : 'Inicia sesión';
-          submitBtn.textContent = isSignUp ? 'Crear cuenta' : 'Entrar';
-          toggleLabel.textContent = isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?';
-          toggleBtn.textContent = isSignUp ? 'Inicia sesión' : 'Crear cuenta';
+          title.textContent         = isSignUp ? 'Crear cuenta' : 'Inicia sesión';
+          submitBtn.textContent     = isSignUp ? 'Crear cuenta' : 'Entrar';
+          toggleLabel.textContent   = isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?';
+          toggleBtn.textContent     = isSignUp ? 'Inicia sesión' : 'Crear cuenta';
           passwordInput.autocomplete = isSignUp ? 'new-password' : 'current-password';
           statusEl.textContent = '';
         });
 
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
-          const email = (document.getElementById('auth-email') as HTMLInputElement).value.trim();
+          const email    = (document.getElementById('auth-email') as HTMLInputElement).value.trim();
           const password = passwordInput.value;
           if (!email || !password) return;
 
           statusEl.textContent = isSignUp ? 'Creando cuenta…' : 'Entrando…';
           submitBtn.setAttribute('disabled', 'true');
 
-          const { error } = isSignUp
-            ? await supabase.auth.signUp({ email, password })
-            : await supabase.auth.signInWithPassword({ email, password });
-
-          if (error) {
-            statusEl.textContent = `Error: ${error.message}`;
-          } else if (isSignUp) {
-            statusEl.textContent = 'Cuenta creada — ya puedes entrar.';
+          if (isSignUp) {
+            pendingName = true;
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (error) {
+              statusEl.textContent = `Error: ${error.message}`;
+              pendingName = false;
+            }
+            // showApp() will be triggered by onAuthStateChange → loadAndSetName → shows modal
+          } else {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) statusEl.textContent = `Error: ${error.message}`;
           }
 
           submitBtn.removeAttribute('disabled');
@@ -262,6 +307,26 @@ const path = Astro.url.pathname;
       .auth-toggle-text { margin-top: 16px; font-size: 0.78rem; color: var(--ink-dim); }
       .auth-toggle-btn { background: none; border: none; color: var(--ion); cursor: pointer; font-size: 0.78rem; padding: 0; text-decoration: underline; }
       .auth-toggle-btn:hover { color: var(--telemetry); }
+
+      .name-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(11, 18, 32, 0.85);
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        padding: 24px;
+      }
+      .name-modal.hidden { display: none !important; }
+      .name-card {
+        max-width: 400px;
+        width: 100%;
+        padding: 32px 28px;
+      }
+      .name-card h2 { font-size: 1.3rem; margin: 10px 0 12px; }
+      .name-card .auth-copy { color: var(--ink-dim); font-size: 0.88rem; margin-bottom: 20px; }
       .footer {
         border-top: 1px solid var(--panel-line);
         padding-top: 20px;
