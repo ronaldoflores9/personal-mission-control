@@ -47,7 +47,7 @@ import Layout from '../layouts/Layout.astro';
     import { getItem, setItem } from '../lib/store';
 
     type Status = 'todo' | 'doing' | 'done';
-    type Task = { id: string; text: string; priority: 'normal' | 'alta'; status: Status };
+    type Task = { id: string; text: string; priority: 'normal' | 'alta'; status: Status; createdAt?: string };
 
     const KEY = 'acm.tasks';
     const STATUSES: Status[] = ['todo', 'doing', 'done'];
@@ -72,6 +72,14 @@ import Layout from '../layouts/Layout.astro';
       text.className = 'task-text';
       text.textContent = task.text;
       card.appendChild(text);
+
+      const days = task.createdAt
+        ? Math.floor((Date.now() - new Date(task.createdAt).getTime()) / 86_400_000)
+        : 0;
+      const age = document.createElement('span');
+      age.className = 'task-age';
+      age.textContent = days === 0 ? 'hoy' : days === 1 ? '1 día' : `${days} días`;
+      card.appendChild(age);
 
       const del = document.createElement('button');
       del.className = 'del-btn';
@@ -121,7 +129,7 @@ import Layout from '../layouts/Layout.astro';
     }
 
     function addTask(text: string, priority: 'normal' | 'alta') {
-      tasks.push({ id: crypto.randomUUID(), text, priority, status: 'todo' });
+      tasks.push({ id: crypto.randomUUID(), text, priority, status: 'todo', createdAt: new Date().toISOString() });
       save(tasks);
       renderBoard();
     }
@@ -255,6 +263,12 @@ import Layout from '../layouts/Layout.astro';
       word-break: break-word;
       line-height: 1.45;
       margin: 0;
+    }
+    :global(.task-age) {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.04em;
     }
     :global(.del-btn) {
       position: absolute;
