@@ -15,6 +15,22 @@ for (let h = 6; h < 22; h++) {
     <p>Agrega clases, laboratorios o cualquier actividad semanal recurrente.</p>
   </section>
 
+  <section class="deadlines-section">
+    <h2>Fechas importantes</h2>
+    <p class="deadlines-sub">Exámenes, entregas, pruebas de motor, lo que sea.</p>
+
+    <form id="deadline-form" class="deadline-form panel">
+      <input id="deadline-label" type="text" placeholder="ej. Examen de termodinámica" required />
+      <input id="deadline-date" type="date" required />
+      <input id="deadline-time" type="time" placeholder="Hora (opcional)" />
+      <button type="submit" class="btn btn-flame">Agregar fecha</button>
+    </form>
+
+    <ul id="deadline-list" class="deadline-list"></ul>
+  </section>
+
+  <h2 class="schedule-title">Horario semanal</h2>
+
   <form id="event-form" class="event-form panel">
     <input id="ev-name" type="text" placeholder="Nombre — ej. Cálculo II" required />
     <select id="ev-day">
@@ -54,19 +70,6 @@ for (let h = 6; h < 22; h++) {
     </table>
   </div>
 
-  <section class="deadlines-section">
-    <h2>Fechas importantes</h2>
-    <p class="deadlines-sub">Exámenes, entregas, pruebas de motor, lo que sea.</p>
-
-    <form id="deadline-form" class="deadline-form panel">
-      <input id="deadline-label" type="text" placeholder="ej. Examen de termodinámica" required />
-      <input id="deadline-date" type="date" required />
-      <button type="submit" class="btn btn-flame">Agregar fecha</button>
-    </form>
-
-    <ul id="deadline-list" class="deadline-list"></ul>
-  </section>
-
   <script>
     import { getItem, setItem } from '../lib/store';
 
@@ -74,7 +77,7 @@ for (let h = 6; h < 22; h++) {
     const DEADLINE_KEY = 'acm.deadlines';
 
     type WeekEvent = { id: string; name: string; day: number; start: string; end: string; color: string };
-    type Deadline  = { id: string; label: string; date: string };
+    type Deadline  = { id: string; label: string; date: string; time?: string };
 
     let events:    WeekEvent[] = [];
     let deadlines: Deadline[]  = [];
@@ -169,6 +172,20 @@ for (let h = 6; h < 22; h++) {
     });
 
     // ── deadlines ─────────────────────────────────────────────────────────
+    function daysUntil(dateStr: string): number {
+      const target = new Date(dateStr + 'T00:00:00').getTime();
+      const today  = new Date();
+      today.setHours(0, 0, 0, 0);
+      return Math.ceil((target - today.getTime()) / 86_400_000);
+    }
+
+    function countdownLabel(days: number): string {
+      if (days < 0)  return `hace ${Math.abs(days)} día${Math.abs(days) === 1 ? '' : 's'}`;
+      if (days === 0) return '¡hoy!';
+      if (days === 1) return 'mañana';
+      return `en ${days} días`;
+    }
+
     function renderDeadlines() {
       const list = document.getElementById('deadline-list')!;
       list.innerHTML = '';
@@ -178,12 +195,19 @@ for (let h = 6; h < 22; h++) {
         return;
       }
       for (const d of sorted) {
+        const days = daysUntil(d.date);
+        const isPast = days < 0;
+        const isUrgent = days >= 0 && days <= 3;
+
         const li = document.createElement('li');
         li.className = 'deadline-item';
-        if (new Date(d.date + 'T23:59:59').getTime() < Date.now()) li.classList.add('past');
+        if (isPast) li.classList.add('past');
+
+        const timeStr = d.time ? ` · ${d.time}` : '';
         li.innerHTML = `
           <span class="deadline-text">${d.label}</span>
-          <span class="mono deadline-date">${d.date}</span>
+          <span class="mono deadline-date">${d.date}${timeStr}</span>
+          <span class="mono deadline-countdown ${isUrgent && !isPast ? 'urgent' : ''}">${countdownLabel(days)}</span>
           <button class="mini-btn mini-btn-del" type="button" aria-label="Eliminar">✕</button>
         `;
         li.querySelector('button')!.addEventListener('click', () => {
@@ -200,11 +224,13 @@ for (let h = 6; h < 22; h++) {
       e.preventDefault();
       const label = document.getElementById('deadline-label') as HTMLInputElement;
       const date  = document.getElementById('deadline-date')  as HTMLInputElement;
+      const time  = document.getElementById('deadline-time')  as HTMLInputElement;
       if (!label.value.trim() || !date.value) return;
-      deadlines.push({ id: crypto.randomUUID(), label: label.value.trim(), date: date.value });
+      deadlines.push({ id: crypto.randomUUID(), label: label.value.trim(), date: date.value, time: time.value || undefined });
       void setItem(DEADLINE_KEY, deadlines);
       label.value = '';
       date.value  = '';
+      time.value  = '';
       renderDeadlines();
     });
 
@@ -288,9 +314,10 @@ for (let h = 6; h < 22; h++) {
     :global(.cell:hover .ev-del) { display: flex; }
     :global(.ev-del:hover) { background: rgba(0,0,0,0.6); color: #fff; }
 
-    .deadlines-section { margin-top: 8px; }
+    .deadlines-section { margin-bottom: 40px; }
     .deadlines-section h2 { font-size: 1.2rem; margin-bottom: 6px; }
     .deadlines-sub { color: var(--ink-dim); font-size: 0.85rem; margin-bottom: 16px; }
+    .schedule-title { font-size: 1.2rem; margin: 0 0 16px; }
 
     .deadline-form {
       display: flex;
@@ -299,7 +326,7 @@ for (let h = 6; h < 22; h++) {
       margin-bottom: 20px;
       flex-wrap: wrap;
     }
-    .deadline-form input[type="text"] { flex: 1 1 240px; }
+    .deadline-form input[type="text"] { flex: 1 1 200px; }
 
     .deadline-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
     .deadline-item {
@@ -313,7 +340,9 @@ for (let h = 6; h < 22; h++) {
     }
     .deadline-item.past { opacity: 0.45; }
     .deadline-text { flex: 1; font-size: 0.9rem; }
-    .deadline-date { color: var(--telemetry); font-size: 0.78rem; }
+    .deadline-date { color: var(--telemetry); font-size: 0.75rem; }
+    .deadline-countdown { font-size: 0.72rem; color: var(--ink-dim); background: var(--void-2); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+    .deadline-countdown.urgent { color: var(--flame); background: rgba(255,107,53,0.12); }
     .deadline-empty { color: var(--ink-dim); font-size: 0.8rem; padding: 8px 0; }
     .mini-btn {
       background: none;
