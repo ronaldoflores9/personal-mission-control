@@ -1,0 +1,259 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Modo enfoque" eyebrow="Aislamiento de cabina">
+  <section class="intro">
+    <h1>Modo enfoque</h1>
+    <p>
+      Un sitio web no puede silenciar las notificaciones de tu compu — ningún
+      navegador se lo permite a nadie, por seguridad. Lo que sí puede hacer:
+      quitarte de encima todo lo demás en pantalla completa, mostrarte tu
+      cuenta regresiva aunque cambies de ventana, y decirte exactamente qué
+      botón apretar para activar el "No molestar" real de tu sistema.
+    </p>
+  </section>
+
+  <form id="settings-form" class="settings panel">
+    <div class="field">
+      <label class="mono" for="intention">Tu intención para esta sesión</label>
+      <input id="intention" type="text" placeholder="ej. Terminar la simulación de empuje" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label class="mono" for="duration">Duración</label>
+        <select id="duration">
+          <option value="15">15 min</option>
+          <option value="25" selected>25 min</option>
+          <option value="45">45 min</option>
+          <option value="60">60 min</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="mono" for="os-select">Tu sistema</label>
+        <select id="os-select">
+          <option value="mac">macOS</option>
+          <option value="windows" selected>Windows</option>
+          <option value="other">Otro / celular</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-flame start-btn">Guardar e iniciar modo enfoque</button>
+  </form>
+
+  <section class="dnd-card panel">
+    <span class="eyebrow">Paso extra — esto sí silencia notificaciones de verdad</span>
+    <div id="dnd-mac" class="dnd-block">
+      <h3>En macOS</h3>
+      <ol>
+        <li>Abre el Centro de Control (ícono de los dos interruptores, esquina superior derecha).</li>
+        <li>Toca <strong>Enfoque</strong> y elige <strong>No molestar</strong>.</li>
+        <li>Selecciona cuánto dura — puedes poner el mismo tiempo que tu sesión.</li>
+      </ol>
+    </div>
+    <div id="dnd-windows" class="dnd-block">
+      <h3>En Windows</h3>
+      <ol>
+        <li>Presiona <strong>Win + N</strong> para abrir el Centro de notificaciones, o busca "Asistente de concentración" en el menú de inicio.</li>
+        <li>Elige <strong>Solo alarmas</strong> o <strong>Solo prioritarias</strong>.</li>
+        <li>Windows lo puede activar automáticamente al compartir pantalla o jugar — puedes agregar "al usar apps a pantalla completa" en Configuración → Sistema → Asistente de concentración.</li>
+      </ol>
+    </div>
+    <div id="dnd-other" class="dnd-block">
+      <h3>En tu celular</h3>
+      <ol>
+        <li>Desliza para abrir el centro de control o configuración rápida.</li>
+        <li>Activa <strong>No molestar</strong> o <strong>Modo concentración</strong>.</li>
+        <li>La mayoría te deja poner un temporizador — hazlo coincidir con tu sesión.</li>
+      </ol>
+    </div>
+  </section>
+
+  <div id="focus-overlay" class="focus-overlay hidden" role="dialog" aria-modal="true" aria-label="Sesión de enfoque activa">
+    <span class="eyebrow">En vuelo</span>
+    <p id="overlay-intention" class="overlay-intention"></p>
+    <div id="overlay-clock" class="overlay-clock mono">25:00</div>
+    <button id="overlay-exit" class="btn overlay-exit" type="button">Salir del modo enfoque</button>
+  </div>
+
+  <script>
+    import { getItem, setItem } from '../lib/store';
+
+    type FocusSettings = { intention: string; duration: number; os: 'mac' | 'windows' | 'other' };
+    const KEY = 'acm.focusSettings';
+    const DEFAULTS: FocusSettings = { intention: '', duration: 25, os: 'windows' };
+
+    const form = document.getElementById('settings-form') as HTMLFormElement;
+    const intentionInput = document.getElementById('intention') as HTMLInputElement;
+    const durationSelect = document.getElementById('duration') as HTMLSelectElement;
+    const osSelect = document.getElementById('os-select') as HTMLSelectElement;
+
+    const dndBlocks = {
+      mac: document.getElementById('dnd-mac')!,
+      windows: document.getElementById('dnd-windows')!,
+      other: document.getElementById('dnd-other')!,
+    };
+
+    function updateDndVisibility() {
+      const chosen = osSelect.value as keyof typeof dndBlocks;
+      (Object.keys(dndBlocks) as (keyof typeof dndBlocks)[]).forEach((key) => {
+        dndBlocks[key].classList.toggle('hidden', key !== chosen);
+      });
+    }
+    osSelect.addEventListener('change', updateDndVisibility);
+
+    async function loadSettings(): Promise<FocusSettings> {
+      return getItem<FocusSettings>(KEY, DEFAULTS);
+    }
+    function saveSettings(settings: FocusSettings) {
+      void setItem(KEY, settings);
+    }
+
+    async function init() {
+      const settings = await loadSettings();
+      intentionInput.value = settings.intention;
+      durationSelect.value = String(settings.duration);
+      osSelect.value = settings.os;
+      updateDndVisibility();
+    }
+    init();
+    window.addEventListener('acm:auth', (e) => {
+      if ((e as CustomEvent).detail?.authenticated) init();
+    });
+
+    // --- Focus session ---
+    const overlay = document.getElementById('focus-overlay')!;
+    const overlayClock = document.getElementById('overlay-clock')!;
+    const overlayIntention = document.getElementById('overlay-intention')!;
+    const overlayExit = document.getElementById('overlay-exit')!;
+    const originalTitle = document.title;
+
+    let timerId: number | null = null;
+
+    function formatTime(s: number) {
+      const m = Math.floor(s / 60).toString().padStart(2, '0');
+      const sec = Math.floor(s % 60).toString().padStart(2, '0');
+      return `${m}:${sec}`;
+    }
+
+    async function requestFullscreenSafe() {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        // fullscreen not available (e.g. iOS Safari) — the overlay still works
+      }
+    }
+
+    function exitFullscreenSafe() {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function notifyEnd(intention: string) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Sesión de enfoque terminada 🚀', {
+          body: intention ? `Misión: ${intention}` : 'Buen trabajo — hora de un descanso.',
+        });
+      }
+    }
+
+    function endSession(intention: string, completed: boolean) {
+      if (timerId) clearInterval(timerId);
+      timerId = null;
+      overlay.classList.add('hidden');
+      document.title = originalTitle;
+      exitFullscreenSafe();
+      if (completed) notifyEnd(intention);
+    }
+
+    function startSession(minutes: number, intention: string) {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
+      let remaining = minutes * 60;
+      overlayIntention.textContent = intention || 'Sin distracciones. Vamos.';
+      overlayClock.textContent = formatTime(remaining);
+      overlay.classList.remove('hidden');
+      requestFullscreenSafe();
+
+      timerId = window.setInterval(() => {
+        remaining -= 1;
+        overlayClock.textContent = formatTime(remaining);
+        document.title = `${formatTime(remaining)} · Enfoque`;
+        if (remaining <= 0) {
+          endSession(intention, true);
+        }
+      }, 1000);
+    }
+
+    overlayExit.addEventListener('click', () => endSession(overlayIntention.textContent || '', false));
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && timerId) {
+        // she left fullscreen manually (e.g. Esc) — keep the session running,
+        // just stop forcing fullscreen back
+      }
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const settings: FocusSettings = {
+        intention: intentionInput.value.trim(),
+        duration: Number(durationSelect.value),
+        os: osSelect.value as FocusSettings['os'],
+      };
+      saveSettings(settings);
+      startSession(settings.duration, settings.intention);
+    });
+  </script>
+
+  <style>
+    .intro { padding: 24px 0 4px; max-width: 64ch; }
+    .intro h1 { font-size: 1.8rem; margin-bottom: 10px; }
+    .intro p { color: var(--ink-dim); }
+
+    .settings {
+      margin: 24px 0;
+      padding: 22px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .field label { font-size: 0.68rem; color: var(--ink-dim); letter-spacing: 0.05em; text-transform: uppercase; }
+    .field-row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .start-btn { align-self: flex-start; }
+
+    .dnd-card { padding: 22px 24px; margin-bottom: 40px; }
+    .dnd-block h3 { font-size: 1rem; margin: 14px 0 8px; }
+    .dnd-block ol { margin: 0; padding-left: 20px; color: var(--ink-dim); font-size: 0.88rem; display: flex; flex-direction: column; gap: 6px; }
+    .dnd-block strong { color: var(--ink); }
+
+    .focus-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: var(--void);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 24px;
+    }
+    .overlay-intention {
+      font-family: var(--font-display);
+      font-size: clamp(1.1rem, 3vw, 1.6rem);
+      max-width: 60ch;
+      color: var(--ink);
+    }
+    .overlay-clock {
+      font-size: clamp(4rem, 16vw, 7rem);
+      font-weight: 700;
+      color: var(--ion, #4ea8ff);
+    }
+    .overlay-exit { margin-top: 12px; }
+  </style>
+</Layout>

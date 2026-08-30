@@ -1,0 +1,223 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Paquete de apoyo" eyebrow="Solo para ti">
+  <section class="intro">
+    <h1>Paquete de apoyo 💌</h1>
+    <p>
+      Para los días de examen, las noches sin dormir armando el cohete, o cuando
+      solo necesitas que alguien te recuerde lo capaz que eres. Presiona el botón
+      para abrir una notita al azar.
+    </p>
+  </section>
+
+  <div class="capsule-area">
+    <button id="open-btn" class="capsule-btn" type="button">
+      <span class="capsule-icon">✦</span>
+      <span class="mono">Abrir una notita</span>
+    </button>
+
+    <div id="note-card" class="note-card panel hidden">
+      <p id="note-text" class="note-text"></p>
+      <span class="mono note-hint">toca «abrir» de nuevo para otra</span>
+    </div>
+  </div>
+
+  <section class="own-notes">
+    <h2>Tus propias notitas</h2>
+    <p class="own-sub">Este espacio es tuyo: guarda recordatorios, logros o cosas que quieras leer de nuevo más tarde.</p>
+
+    <form id="note-form" class="note-form panel">
+      <textarea id="note-input" rows="2" placeholder="Escribe algo para tu yo del futuro…" required></textarea>
+      <button type="submit" class="btn btn-flame">Guardar</button>
+    </form>
+
+    <ul id="own-note-list" class="own-note-list"></ul>
+  </section>
+
+  <script>
+    import { getItem, setItem } from '../lib/store';
+
+    const MESSAGES = [
+      'Cada sistema complejo empezó como un montón de piezas sueltas sobre una mesa. Vas bien.',
+      'Recuerda: incluso los mejores cohetes tienen abortos de misión. Lo que importa es la telemetría que aprendes de cada uno.',
+      'Eres de las personas que hacen que un equipo de cohetería realmente vuele. No lo olvides en las semanas difíciles.',
+      'Un examen es solo una ventana de lanzamiento más. Si esta no sale perfecta, hay otra.',
+      'Estoy orgulloso de ti, en serio. No por lo que logras, sino por cómo sigues intentando.',
+      'Respira. Toma agua. Hasta las mejores misiones necesitan una pausa de reabastecimiento.',
+      'Si hoy sientes que vas lento: los cohetes también empiezan despacio, y luego nada los detiene.',
+      'Eres mucho más capaz de lo que la ansiedad de medianoche te quiere hacer creer.',
+      'Pase lo que pase con esa entrega, aquí sigo, animándote desde la torre de control.',
+      'Un pequeño recordatorio con cariño: mereces descansar tanto como mereces lograr cosas.',
+    ];
+
+    const OWN_KEY = 'acm.ownNotes';
+    let lastIndex = -1;
+
+    const openBtn = document.getElementById('open-btn')!;
+    const noteCard = document.getElementById('note-card')!;
+    const noteText = document.getElementById('note-text')!;
+
+    openBtn.addEventListener('click', () => {
+      let idx = Math.floor(Math.random() * MESSAGES.length);
+      if (MESSAGES.length > 1 && idx === lastIndex) {
+        idx = (idx + 1) % MESSAGES.length;
+      }
+      lastIndex = idx;
+      noteText.textContent = MESSAGES[idx];
+      noteCard.classList.remove('hidden');
+      noteCard.classList.remove('pop');
+      // restart animation
+      void (noteCard as HTMLElement).offsetWidth;
+      noteCard.classList.add('pop');
+    });
+
+    // --- Own notes ---
+    type OwnNote = { id: string; text: string; date: string };
+    function saveOwn(list: OwnNote[]) {
+      void setItem(OWN_KEY, list);
+    }
+
+    let ownNotes: OwnNote[] = [];
+
+    function renderOwn() {
+      const list = document.getElementById('own-note-list')!;
+      list.innerHTML = '';
+      if (ownNotes.length === 0) {
+        list.innerHTML = '<li class="mono own-empty">Aún no has guardado ninguna.</li>';
+        return;
+      }
+      const sorted = [...ownNotes].reverse();
+      for (const n of sorted) {
+        const li = document.createElement('li');
+        li.className = 'own-note-item';
+        li.innerHTML = `
+          <p class="own-note-text">${n.text.replace(/</g, '&lt;')}</p>
+          <div class="own-note-foot">
+            <span class="mono own-note-date">${n.date}</span>
+            <button class="mini-btn mini-btn-del" type="button" aria-label="Eliminar">✕</button>
+          </div>
+        `;
+        li.querySelector('button')!.addEventListener('click', () => {
+          ownNotes = ownNotes.filter((x) => x.id !== n.id);
+          saveOwn(ownNotes);
+          renderOwn();
+        });
+        list.appendChild(li);
+      }
+    }
+
+    const form = document.getElementById('note-form') as HTMLFormElement;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('note-input') as HTMLTextAreaElement;
+      if (!input.value.trim()) return;
+      ownNotes.push({
+        id: crypto.randomUUID(),
+        text: input.value.trim(),
+        date: new Date().toISOString().slice(0, 10),
+      });
+      saveOwn(ownNotes);
+      input.value = '';
+      renderOwn();
+    });
+
+    async function init() {
+      ownNotes = await getItem<OwnNote[]>(OWN_KEY, []);
+      renderOwn();
+    }
+    init();
+    window.addEventListener('acm:auth', (e) => {
+      if ((e as CustomEvent).detail?.authenticated) init();
+    });
+  </script>
+
+  <style>
+    .intro { padding: 24px 0 4px; max-width: 62ch; }
+    .intro h1 { font-size: 1.8rem; margin-bottom: 10px; }
+    .intro p { color: var(--ink-dim); }
+
+    .capsule-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 40px 0 48px;
+    }
+    .capsule-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, var(--ion), var(--blush));
+      border: none;
+      color: #071322;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 16px 28px;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .capsule-btn:hover { transform: translateY(-2px) scale(1.02); }
+    .capsule-icon { font-size: 1rem; }
+
+    .note-card {
+      max-width: 520px;
+      padding: 28px 32px;
+      text-align: center;
+      border-color: var(--blush);
+    }
+    .note-card.hidden { display: none; }
+    .note-card.pop { animation: pop 0.35s ease; }
+    @keyframes pop {
+      from { opacity: 0; transform: translateY(6px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .note-text {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      line-height: 1.5;
+      color: var(--ink);
+      margin-bottom: 14px;
+    }
+    .note-hint { color: var(--ink-dim); font-size: 0.68rem; }
+
+    .own-notes h2 { font-size: 1.2rem; margin-bottom: 6px; }
+    .own-sub { color: var(--ink-dim); font-size: 0.85rem; margin-bottom: 16px; }
+
+    .note-form {
+      display: flex;
+      gap: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .note-form textarea { flex: 1 1 260px; resize: vertical; font-family: var(--font-body); }
+
+    .own-note-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .own-note-item {
+      padding: 12px 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-line);
+      border-radius: var(--radius-sm);
+    }
+    .own-note-text { font-size: 0.9rem; margin-bottom: 8px; }
+    .own-note-foot { display: flex; align-items: center; justify-content: space-between; }
+    .own-note-date { color: var(--ink-dim); font-size: 0.7rem; }
+    .own-empty { color: var(--ink-dim); font-size: 0.8rem; }
+    .mini-btn {
+      background: none;
+      border: 1px solid var(--panel-line);
+      color: var(--ink-dim);
+      border-radius: 6px;
+      width: 26px;
+      height: 24px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .mini-btn-del:hover { color: var(--flame); border-color: var(--flame); }
+  </style>
+</Layout>

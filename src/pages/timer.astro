@@ -1,0 +1,199 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Cuenta regresiva" eyebrow="Secuencia de enfoque">
+  <section class="intro">
+    <h1>Cuenta regresiva de enfoque</h1>
+    <p>Elige tu duración, presiona iniciar y trátalo como una cuenta regresiva real: sin distracciones hasta el despegue.</p>
+  </section>
+
+  <div class="timer-panel panel">
+    <div class="presets" role="group" aria-label="Duración de la sesión">
+      <button class="preset-btn active" data-mins="25" type="button">25 min · enfoque</button>
+      <button class="preset-btn" data-mins="50" type="button">50 min · enfoque largo</button>
+      <button class="preset-btn" data-mins="5" type="button">5 min · descanso</button>
+    </div>
+
+    <div class="display">
+      <span class="mono status-tag" id="status-tag">EN ESPERA</span>
+      <div class="mono clock" id="clock">25:00</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-flame" id="start-btn" type="button">Iniciar cuenta regresiva</button>
+      <button class="btn" id="reset-btn" type="button">Reiniciar</button>
+    </div>
+
+    <p class="mono session-count" id="session-count">Sesiones completadas hoy: 0</p>
+  </div>
+
+  <script>
+    import { getItem, setItem } from '../lib/store';
+
+    const clockEl = document.getElementById('clock')!;
+    const statusEl = document.getElementById('status-tag')!;
+    const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
+    const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
+    const sessionEl = document.getElementById('session-count')!;
+    const presetButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.preset-btn'));
+
+    const SESSION_KEY = 'acm.sessions';
+    type SessionRecord = { date: string; count: number };
+
+    let totalSeconds = 25 * 60;
+    let remaining = totalSeconds;
+    let running = false;
+    let intervalId: number | null = null;
+    let todayCount = 0;
+
+    function todayKey() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    async function loadSessionCount(): Promise<number> {
+      const record = await getItem<SessionRecord>(SESSION_KEY, { date: todayKey(), count: 0 });
+      return record.date === todayKey() ? record.count : 0;
+    }
+
+    async function bumpSessionCount() {
+      const n = (await loadSessionCount()) + 1;
+      await setItem(SESSION_KEY, { date: todayKey(), count: n });
+      todayCount = n;
+      renderSessionCount();
+    }
+
+    function renderSessionCount() {
+      sessionEl.textContent = `Sesiones completadas hoy: ${todayCount}`;
+    }
+
+    function formatTime(s: number) {
+      const m = Math.floor(s / 60).toString().padStart(2, '0');
+      const sec = Math.floor(s % 60).toString().padStart(2, '0');
+      return `${m}:${sec}`;
+    }
+
+    function renderClock() {
+      clockEl.textContent = formatTime(remaining);
+    }
+
+    function setStatus(text: string) {
+      statusEl.textContent = text;
+    }
+
+    presetButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (running) return;
+        presetButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mins = Number(btn.dataset.mins);
+        totalSeconds = mins * 60;
+        remaining = totalSeconds;
+        renderClock();
+        setStatus('EN ESPERA');
+      });
+    });
+
+    function tick() {
+      remaining -= 1;
+      renderClock();
+      if (remaining <= 0) {
+        stop();
+        setStatus('DESPEGUE 🚀');
+        void bumpSessionCount();
+        try {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.4);
+        } catch {
+          // audio not available; silent fallback
+        }
+      }
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      startBtn.textContent = 'Pausar';
+      setStatus('EN VUELO');
+      intervalId = window.setInterval(tick, 1000);
+    }
+
+    function stop() {
+      running = false;
+      startBtn.textContent = 'Iniciar cuenta regresiva';
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (running) {
+        stop();
+        setStatus('PAUSADO');
+      } else {
+        start();
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      stop();
+      remaining = totalSeconds;
+      renderClock();
+      setStatus('EN ESPERA');
+    });
+
+    async function init() {
+      todayCount = await loadSessionCount();
+      renderClock();
+      renderSessionCount();
+    }
+    init();
+    window.addEventListener('acm:auth', (e) => {
+      if ((e as CustomEvent).detail?.authenticated) init();
+    });
+  </script>
+
+  <style>
+    .intro { padding: 24px 0 4px; max-width: 60ch; }
+    .intro h1 { font-size: 1.8rem; margin-bottom: 10px; }
+    .intro p { color: var(--ink-dim); }
+
+    .timer-panel {
+      margin-top: 24px;
+      padding: 36px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      text-align: center;
+    }
+    .presets { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .preset-btn {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      background: var(--void-2);
+      border: 1px solid var(--panel-line);
+      color: var(--ink-dim);
+      border-radius: 999px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    .preset-btn.active { color: var(--telemetry); border-color: var(--telemetry); }
+
+    .display { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .status-tag { font-size: 0.75rem; letter-spacing: 0.15em; color: var(--ion); }
+    .clock { font-size: clamp(3rem, 12vw, 5rem); font-weight: 700; letter-spacing: 0.02em; }
+
+    .controls { display: flex; gap: 12px; }
+    .session-count { color: var(--ink-dim); font-size: 0.75rem; }
+  </style>
+</Layout>

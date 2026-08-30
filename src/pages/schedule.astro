@@ -1,0 +1,214 @@
+---
+import Layout from '../layouts/Layout.astro';
+const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const hours = ['7-9', '9-11', '11-13', '13-15', '15-17', '17-19', '19-21'];
+---
+<Layout title="Horario de vuelo" eyebrow="Plan semanal">
+  <section class="intro">
+    <h1>Horario de vuelo</h1>
+    <p>Haz clic en cualquier casilla para anotar clase, laboratorio o práctica de cohetería. Se guarda solo.</p>
+  </section>
+
+  <div class="table-wrap panel">
+    <table id="schedule-table">
+      <thead>
+        <tr>
+          <th class="corner mono">Hora</th>
+          {days.map((d) => <th class="mono">{d}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {hours.map((h) => (
+          <tr>
+            <td class="hour-label mono">{h}</td>
+            {days.map((_, di) => (
+              <td class="cell" data-key={`${h}|${di}`} tabindex="0" role="button" aria-label="Editar celda de horario"></td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <section class="deadlines-section">
+    <h2>Fechas importantes</h2>
+    <p class="deadlines-sub">Exámenes, entregas, pruebas de motor, lo que sea. Esto alimenta la cuenta regresiva del centro de mando.</p>
+
+    <form id="deadline-form" class="deadline-form panel">
+      <input id="deadline-label" type="text" placeholder="ej. Examen de termodinámica" required />
+      <input id="deadline-date" type="date" required />
+      <button type="submit" class="btn btn-flame">Agregar fecha</button>
+    </form>
+
+    <ul id="deadline-list" class="deadline-list"></ul>
+  </section>
+
+  <script>
+    import { getItem, setItem } from '../lib/store';
+
+    const CELL_KEY = 'acm.schedule';
+    const DEADLINE_KEY = 'acm.deadlines';
+
+    // --- Weekly grid ---
+    let cells: Record<string, string> = {};
+
+    function saveCells() {
+      void setItem(CELL_KEY, cells);
+    }
+
+    function wireCells() {
+      document.querySelectorAll<HTMLTableCellElement>('.cell').forEach((cell) => {
+        const key = cell.dataset.key!;
+        cell.textContent = cells[key] || '';
+        cell.classList.toggle('filled', Boolean(cells[key]));
+
+        const edit = () => {
+          const current = cells[key] || '';
+          const value = prompt('¿Qué hay en esta franja?', current);
+          if (value === null) return;
+          if (value.trim() === '') {
+            delete cells[key];
+            cell.textContent = '';
+            cell.classList.remove('filled');
+          } else {
+            cells[key] = value.trim();
+            cell.textContent = value.trim();
+            cell.classList.add('filled');
+          }
+          saveCells();
+        };
+        cell.onclick = edit;
+        cell.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            edit();
+          }
+        };
+      });
+    }
+
+    // --- Deadlines ---
+    type Deadline = { id: string; label: string; date: string };
+    function saveDeadlines(list: Deadline[]) {
+      void setItem(DEADLINE_KEY, list);
+    }
+
+    let deadlines: Deadline[] = [];
+
+    function renderDeadlines() {
+      const list = document.getElementById('deadline-list')!;
+      list.innerHTML = '';
+      const sorted = [...deadlines].sort((a, b) => a.date.localeCompare(b.date));
+      if (sorted.length === 0) {
+        list.innerHTML = '<li class="mono deadline-empty">Sin fechas todavía.</li>';
+        return;
+      }
+      for (const d of sorted) {
+        const li = document.createElement('li');
+        li.className = 'deadline-item';
+        const isPast = new Date(d.date + 'T23:59:59').getTime() < Date.now();
+        if (isPast) li.classList.add('past');
+        li.innerHTML = `
+          <span class="deadline-text">${d.label}</span>
+          <span class="mono deadline-date">${d.date}</span>
+          <button class="mini-btn mini-btn-del" type="button" aria-label="Eliminar fecha">✕</button>
+        `;
+        li.querySelector('button')!.addEventListener('click', () => {
+          deadlines = deadlines.filter((x) => x.id !== d.id);
+          saveDeadlines(deadlines);
+          renderDeadlines();
+        });
+        list.appendChild(li);
+      }
+    }
+
+    const form = document.getElementById('deadline-form') as HTMLFormElement;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const label = (document.getElementById('deadline-label') as HTMLInputElement);
+      const date = (document.getElementById('deadline-date') as HTMLInputElement);
+      if (!label.value.trim() || !date.value) return;
+      deadlines.push({ id: crypto.randomUUID(), label: label.value.trim(), date: date.value });
+      saveDeadlines(deadlines);
+      label.value = '';
+      date.value = '';
+      renderDeadlines();
+    });
+
+    async function init() {
+      cells = await getItem<Record<string, string>>(CELL_KEY, {});
+      wireCells();
+      deadlines = await getItem<Deadline[]>(DEADLINE_KEY, []);
+      renderDeadlines();
+    }
+    init();
+    window.addEventListener('acm:auth', (e) => {
+      if ((e as CustomEvent).detail?.authenticated) init();
+    });
+  </script>
+
+  <style>
+    .intro { padding: 24px 0 4px; max-width: 60ch; }
+    .intro h1 { font-size: 1.8rem; margin-bottom: 10px; }
+    .intro p { color: var(--ink-dim); }
+
+    .table-wrap {
+      margin: 20px 0 40px;
+      overflow-x: auto;
+      padding: 8px;
+    }
+    table { border-collapse: collapse; width: 100%; min-width: 640px; }
+    th, td { padding: 8px 10px; text-align: left; border: 1px solid var(--panel-line); }
+    th { font-size: 0.68rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .corner { color: var(--telemetry); }
+    .hour-label { font-size: 0.7rem; color: var(--ink-dim); white-space: nowrap; }
+    .cell {
+      cursor: pointer;
+      font-size: 0.78rem;
+      min-width: 96px;
+      height: 44px;
+      vertical-align: middle;
+      transition: background 0.15s ease;
+    }
+    .cell:hover { background: var(--void-2); }
+    .cell.filled { background: rgba(95, 212, 208, 0.08); color: var(--ink); }
+
+    .deadlines-section h2 { font-size: 1.2rem; margin-bottom: 6px; }
+    .deadlines-sub { color: var(--ink-dim); font-size: 0.85rem; margin-bottom: 16px; }
+
+    .deadline-form {
+      display: flex;
+      gap: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .deadline-form input[type="text"] { flex: 1 1 240px; }
+
+    .deadline-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .deadline-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-line);
+      border-radius: var(--radius-sm);
+    }
+    .deadline-item.past { opacity: 0.45; }
+    .deadline-text { flex: 1; font-size: 0.9rem; }
+    .deadline-date { color: var(--telemetry); font-size: 0.78rem; }
+    .deadline-empty { color: var(--ink-dim); font-size: 0.8rem; padding: 8px 0; }
+    .mini-btn {
+      background: none;
+      border: 1px solid var(--panel-line);
+      color: var(--ink-dim);
+      border-radius: 6px;
+      width: 26px;
+      height: 24px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .mini-btn-del:hover { color: var(--flame); border-color: var(--flame); }
+  </style>
+</Layout>

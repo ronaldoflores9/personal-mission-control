@@ -1,0 +1,68 @@
+---
+interface Props {
+  size?: number;
+}
+const { size = 220 } = Astro.props;
+---
+<svg
+  class="mission-patch"
+  width={size}
+  height={size}
+  viewBox="0 0 220 220"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-label="Parche de misión de Alexandra"
+>
+  <defs>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ea8ff" />
+      <stop offset="100%" stop-color="#5fd4d0" />
+    </linearGradient>
+    <radialGradient id="sky" cx="50%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#16233d" />
+      <stop offset="100%" stop-color="#0b1220" />
+    </radialGradient>
+  </defs>
+
+  <circle cx="110" cy="110" r="106" fill="url(#sky)" stroke="url(#ring)" stroke-width="4" />
+  <circle cx="110" cy="110" r="92" fill="none" stroke="#24314d" stroke-width="1" stroke-dasharray="2 4" />
+
+  <!-- stars -->
+  <g fill="#e8ecf1">
+    <circle cx="52" cy="58" r="1.6" />
+    <circle cx="168" cy="48" r="1.2" />
+    <circle cx="170" cy="150" r="1.6" />
+    <circle cx="44" cy="140" r="1.2" />
+    <circle cx="150" cy="170" r="1" />
+    <circle cx="60" cy="175" r="1.4" />
+  </g>
+
+  <!-- rocket -->
+  <g transform="translate(110,112) rotate(-35)">
+    <path d="M0,-46 C12,-30 14,-6 8,18 L-8,18 C-14,-6 -12,-30 0,-46 Z" fill="#f4efe3" stroke="#2a2620" stroke-width="1.5"/>
+    <path d="M-8,10 L-22,26 L-8,22 Z" fill="#4ea8ff" stroke="#2a2620" stroke-width="1.5"/>
+    <path d="M8,10 L22,26 L8,22 Z" fill="#4ea8ff" stroke="#2a2620" stroke-width="1.5"/>
+    <circle cx="0" cy="-16" r="6" fill="#5fd4d0" stroke="#2a2620" stroke-width="1.5"/>
+    <path d="M-6,18 C-6,30 0,38 0,38 C0,38 6,30 6,18 Z" fill="#f5a9b8" opacity="0.9">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite" />
+    </path>
+  </g>
+
+  <!-- orbit path -->
+  <ellipse cx="110" cy="118" rx="70" ry="18" fill="none" stroke="#5fd4d0" stroke-width="1" opacity="0.5"/>
+
+  <!-- text ring -->
+  <path id="patchCurveTop" d="M 30 110 A 80 80 0 0 1 190 110" fill="none" />
+  <text font-family="JetBrains Mono, monospace" font-size="12.5" letter-spacing="3" fill="#e8ecf1">
+    <textPath href="#patchCurveTop" startOffset="50%" text-anchor="middle">ALEXANDRA · FLIGHT ENGINEER</textPath>
+  </text>
+
+  <path id="patchCurveBottom" d="M 190 118 A 80 80 0 0 1 30 118" fill="none" />
+  <text font-family="JetBrains Mono, monospace" font-size="11" letter-spacing="3" fill="#4ea8ff">
+    <textPath href="#patchCurveBottom" startOffset="50%" text-anchor="middle">MISSION: EVERY DAY</textPath>
+  </text>
+</svg>
+
+<style>
+  .mission-patch { display: block; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4)); }
+</style>

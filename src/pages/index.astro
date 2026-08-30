@@ -1,0 +1,174 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MissionPatch from '../components/MissionPatch.astro';
+---
+<Layout title="Centro de mando" eyebrow="Bienvenida a bordo">
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Tu propio centro de mando.</h1>
+      <p class="hero-sub">
+        Entre clases, laboratorios y la cohetería, alguien tenía que construirte
+        una torre de control. Aquí puedes organizar tus misiones, tu horario
+        y tomarte un respiro — todo en un solo lugar, hecho para ti.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-flame" href="/board">Ver tablero de misión →</a>
+        <a class="btn" href="/notes">Abrir paquete de apoyo 💌</a>
+      </div>
+    </div>
+    <div class="hero-patch">
+      <MissionPatch size={230} />
+    </div>
+  </section>
+
+  <section class="readout panel" id="readout">
+    <div class="readout-head">
+      <span class="eyebrow">Próximo lanzamiento</span>
+      <a href="/schedule" class="mono readout-edit">gestionar fechas →</a>
+    </div>
+    <div id="readout-body" class="readout-body">
+      <p class="mono readout-empty">Sin fechas registradas todavía. Agrega tu próximo examen, entrega o lanzamiento en «Horario de vuelo».</p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <a href="/board" class="card panel">
+      <span class="eyebrow">Organización</span>
+      <h3>Tablero de misión</h3>
+      <p>Un scrumboard simple: Pre-vuelo, En vuelo y Aterrizado. Arrastra tus tareas o muévelas con un clic.</p>
+    </a>
+    <a href="/schedule" class="card panel">
+      <span class="eyebrow">Semana</span>
+      <h3>Horario de vuelo</h3>
+      <p>Tu semana de clases, laboratorios y prácticas de cohetería, de un vistazo.</p>
+    </a>
+    <a href="/timer" class="card panel">
+      <span class="eyebrow">Enfoque</span>
+      <h3>Cuenta regresiva</h3>
+      <p>Un temporizador de estudio estilo "T-menos" para sesiones de enfoque y descansos.</p>
+    </a>
+    <a href="/notes" class="card panel">
+      <span class="eyebrow">Para ti</span>
+      <h3>Paquete de apoyo</h3>
+      <p>Notitas para los días difíciles — y espacio para que guardes las tuyas.</p>
+    </a>
+  </section>
+
+  <script>
+    import { getItem } from '../lib/store';
+
+    type Deadline = { id: string; label: string; date: string };
+    const KEY = 'acm.deadlines';
+
+    async function render() {
+      const body = document.getElementById('readout-body');
+      if (!body) return;
+      const all = await getItem<Deadline[]>(KEY, []);
+      const deadlines = all
+        .filter((d) => new Date(d.date + 'T23:59:59').getTime() >= Date.now())
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      if (deadlines.length === 0) {
+        body.innerHTML = '<p class="mono readout-empty">Sin fechas registradas todavía. Agrega tu próximo examen, entrega o lanzamiento en «Horario de vuelo».</p>';
+        return;
+      }
+
+      const next = deadlines[0];
+      const target = new Date(next.date + 'T23:59:59').getTime();
+
+      function tick() {
+        const diff = Math.max(0, target - Date.now());
+        const days = Math.floor(diff / 86400000);
+        const hours = Math.floor((diff % 86400000) / 3600000);
+        const mins = Math.floor((diff % 3600000) / 60000);
+        const el = document.getElementById('countdown-num');
+        if (el) el.textContent = `T-${days}d ${hours}h ${mins}m`;
+      }
+
+      body.innerHTML = `
+        <div class="countdown-row">
+          <div>
+            <div class="countdown-label">${next.label}</div>
+            <div class="mono countdown-date">${next.date}</div>
+          </div>
+          <div id="countdown-num" class="mono countdown-num">—</div>
+        </div>
+        ${deadlines.length > 1 ? `<p class="mono readout-more">+ ${deadlines.length - 1} fecha(s) más en el horario</p>` : ''}
+      `;
+      tick();
+      setInterval(tick, 60000);
+    }
+
+    render();
+    window.addEventListener('acm:auth', (e) => {
+      if ((e as CustomEvent).detail?.authenticated) render();
+    });
+  </script>
+
+  <style>
+    .hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 32px;
+      padding: 40px 0 32px;
+      flex-wrap: wrap;
+    }
+    .hero-text { flex: 1 1 380px; }
+    .hero h1 {
+      font-size: clamp(1.9rem, 4vw, 2.6rem);
+      margin-bottom: 16px;
+    }
+    .hero-sub {
+      color: var(--ink-dim);
+      max-width: 46ch;
+      margin-bottom: 24px;
+    }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero-patch { flex: 0 0 auto; }
+
+    .readout { padding: 20px 24px; margin-bottom: 32px; }
+    .readout-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .readout-edit {
+      font-size: 0.72rem;
+      color: var(--ink-dim);
+      text-decoration: none;
+    }
+    .readout-edit:hover { color: var(--telemetry); }
+    .readout-empty { color: var(--ink-dim); font-size: 0.85rem; }
+    .countdown-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .countdown-label { font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; }
+    .countdown-date { color: var(--ink-dim); font-size: 0.78rem; }
+    .countdown-num { font-size: 1.5rem; color: var(--ion); font-weight: 700; }
+    .readout-more { margin-top: 10px; color: var(--ink-dim); font-size: 0.72rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      padding: 20px;
+      text-decoration: none;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .card:hover { border-color: var(--telemetry); transform: translateY(-2px); }
+    .card h3 { font-size: 1.05rem; }
+    .card p { color: var(--ink-dim); font-size: 0.85rem; }
+  </style>
+</Layout>

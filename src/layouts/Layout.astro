@@ -1,0 +1,250 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  eyebrow?: string;
+}
+const { title, eyebrow } = Astro.props;
+const nav = [
+  { href: '/', label: 'Centro de mando' },
+  { href: '/board', label: 'Tablero de misión' },
+  { href: '/schedule', label: 'Horario de vuelo' },
+  { href: '/timer', label: 'Cuenta regresiva' },
+  { href: '/focus', label: 'Modo enfoque' },
+  { href: '/notes', label: 'Paquete de apoyo' },
+];
+const path = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="description" content="Centro de mando personal de Alexandra — misiones, horario y motivación." />
+    <title>{title} · Centro de Mando</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="wrap topbar-inner">
+        <a href="/" class="brand">
+          <span class="brand-mark">✦</span>
+          <span class="brand-text">
+            <span class="brand-line1">CENTRO DE MANDO</span>
+            <span class="brand-line2">Alexandra · Equipo de cohetería</span>
+          </span>
+        </a>
+        <nav class="nav" aria-label="Navegación principal">
+          {nav.map((item) => (
+            <a href={item.href} class:list={['nav-link', { active: path === item.href }]}>
+              {item.label}
+            </a>
+          ))}
+        </nav>
+        <button id="logout-btn" class="logout-btn mono hidden" type="button">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <div id="auth-gate" class="auth-gate hidden">
+      <div class="auth-card panel">
+        <span class="eyebrow">Acceso</span>
+        <h2>Inicia sesión para continuar</h2>
+        <p class="auth-copy">
+          Escribe tu correo y te mandamos un enlace mágico — sin contraseñas.
+          Tus tareas, horario y notas quedan ligadas solo a tu cuenta.
+        </p>
+        <form id="auth-form" class="auth-form">
+          <input id="auth-email" type="email" placeholder="tu@correo.com" required autocomplete="email" />
+          <button type="submit" class="btn btn-flame">Enviar enlace mágico</button>
+        </form>
+        <p id="auth-status" class="mono auth-status"></p>
+      </div>
+    </div>
+
+    <main class="wrap main hidden" id="app-content">
+      <slot />
+    </main>
+
+    <script>
+      import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
+      const gate = document.getElementById('auth-gate')!;
+      const content = document.getElementById('app-content')!;
+      const logoutBtn = document.getElementById('logout-btn')!;
+      const form = document.getElementById('auth-form') as HTMLFormElement;
+      const statusEl = document.getElementById('auth-status')!;
+
+      function showApp() {
+        gate.classList.add('hidden');
+        content.classList.remove('hidden');
+        logoutBtn.classList.remove('hidden');
+        window.dispatchEvent(new CustomEvent('acm:auth', { detail: { authenticated: true } }));
+      }
+
+      function showGate(message?: string) {
+        content.classList.add('hidden');
+        gate.classList.remove('hidden');
+        logoutBtn.classList.add('hidden');
+        if (message) statusEl.textContent = message;
+        window.dispatchEvent(new CustomEvent('acm:auth', { detail: { authenticated: false } }));
+      }
+
+      if (!isSupabaseConfigured) {
+        showGate(
+          'Supabase todavía no está configurado en este sitio (faltan PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY).'
+        );
+        form.querySelector('button')!.setAttribute('disabled', 'true');
+      } else {
+        supabase.auth.getSession().then(({ data }) => {
+          if (data.session) showApp();
+          else showGate();
+        });
+
+        supabase.auth.onAuthStateChange((_event, session) => {
+          if (session) showApp();
+          else showGate();
+        });
+
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const emailInput = document.getElementById('auth-email') as HTMLInputElement;
+          const email = emailInput.value.trim();
+          if (!email) return;
+          statusEl.textContent = 'Enviando enlace…';
+          const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: { emailRedirectTo: window.location.origin },
+          });
+          statusEl.textContent = error
+            ? `Error: ${error.message}`
+            : `Listo — revisa ${email} y abre el enlace para entrar.`;
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+          await supabase.auth.signOut();
+        });
+      }
+    </script>
+
+    <footer class="wrap footer">
+      <p class="mono footer-text">T-MINUS SIEMPRE · hecho con cariño, para que despegues cada día 🚀</p>
+    </footer>
+
+    <style>
+      .topbar {
+        border-bottom: 1px solid var(--panel-line);
+        background: rgba(11, 18, 32, 0.75);
+        backdrop-filter: blur(10px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+      .brand-mark {
+        color: var(--ion);
+        font-size: 1.1rem;
+      }
+      .brand-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+      }
+      .brand-line1 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: 0.03em;
+      }
+      .brand-line2 {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        color: var(--ink-dim);
+      }
+      .nav {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .nav-link {
+        font-family: var(--font-mono);
+        font-size: 0.76rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        text-decoration: none;
+        color: var(--ink-dim);
+        padding: 8px 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+        transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+      }
+      .nav-link:hover { color: var(--ink); border-color: var(--panel-line); }
+      .nav-link.active {
+        color: var(--telemetry);
+        border-color: var(--panel-line);
+        background: var(--panel);
+      }
+      .page-eyebrow { padding-top: 28px; }
+      .main {
+        padding-top: 16px;
+        padding-bottom: 80px;
+        min-height: 60vh;
+      }
+      .hidden { display: none !important; }
+
+      .logout-btn {
+        font-size: 0.7rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        background: none;
+        border: 1px solid var(--panel-line);
+        color: var(--ink-dim);
+        border-radius: var(--radius-sm);
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+      .logout-btn:hover { color: var(--flame); border-color: var(--flame); }
+
+      .auth-gate {
+        display: flex;
+        justify-content: center;
+        padding: 60px 24px 100px;
+      }
+      .auth-card {
+        max-width: 420px;
+        width: 100%;
+        padding: 32px 28px;
+        text-align: left;
+      }
+      .auth-card h2 { font-size: 1.3rem; margin: 10px 0 12px; }
+      .auth-copy { color: var(--ink-dim); font-size: 0.88rem; margin-bottom: 20px; }
+      .auth-form { display: flex; flex-direction: column; gap: 10px; }
+      .auth-status { margin-top: 14px; font-size: 0.72rem; color: var(--telemetry); min-height: 1em; }
+      .footer {
+        border-top: 1px solid var(--panel-line);
+        padding-top: 20px;
+        padding-bottom: 32px;
+      }
+      .footer-text {
+        font-size: 0.72rem;
+        color: var(--ink-dim);
+        text-align: center;
+        letter-spacing: 0.05em;
+      }
+    </style>
+  </body>
+</html>

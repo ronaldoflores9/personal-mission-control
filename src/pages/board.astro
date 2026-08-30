@@ -1,0 +1,273 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Tablero de misión" eyebrow="Secuencia de lanzamiento">
+  <section class="intro">
+    <h1>Tablero de misión</h1>
+    <p>Agrega tareas y muévelas por la secuencia de lanzamiento a medida que avanzas. Todo se guarda en este navegador automáticamente.</p>
+  </section>
+
+  <form id="add-form" class="add-form panel">
+    <input id="add-input" type="text" placeholder="Nueva tarea… ej. Entregar reporte de propulsión" required />
+    <select id="add-priority">
+      <option value="normal">Prioridad normal</option>
+      <option value="alta">Prioridad alta</option>
+    </select>
+    <button type="submit" class="btn btn-flame">Añadir</button>
+  </form>
+
+  <div class="board" id="board">
+    <div class="column" data-status="todo">
+      <div class="column-head">
+        <span class="mono col-tag">01</span>
+        <h2>Pre-vuelo</h2>
+        <span class="count mono" id="count-todo">0</span>
+      </div>
+      <div class="column-body" id="col-todo" data-status="todo"></div>
+    </div>
+    <div class="column" data-status="doing">
+      <div class="column-head">
+        <span class="mono col-tag">02</span>
+        <h2>En vuelo</h2>
+        <span class="count mono" id="count-doing">0</span>
+      </div>
+      <div class="column-body" id="col-doing" data-status="doing"></div>
+    </div>
+    <div class="column" data-status="done">
+      <div class="column-head">
+        <span class="mono col-tag">03</span>
+        <h2>Aterrizado</h2>
+        <span class="count mono" id="count-done">0</span>
+      </div>
+      <div class="column-body" id="col-done" data-status="done"></div>
+    </div>
+  </div>
+
+  <script>
+    import { getItem, setItem } from '../lib/store';
+
+    type Status = 'todo' | 'doing' | 'done';
+    type Task = { id: string; text: string; priority: 'normal' | 'alta'; status: Status };
+
+    const KEY = 'acm.tasks';
+    const STATUSES: Status[] = ['todo', 'doing', 'done'];
+
+    async function load(): Promise<Task[]> {
+      return getItem<Task[]>(KEY, []);
+    }
+    function save(tasks: Task[]) {
+      void setItem(KEY, tasks);
+    }
+
+    let tasks: Task[] = [];
+
+    function makeCard(task: Task): HTMLElement {
+      const card = document.createElement('div');
+      card.className = 'task-card';
+      card.draggable = true;
+      card.dataset.id = task.id;
+      if (task.priority === 'alta') card.classList.add('priority-alta');
+
+      const text = document.createElement('p');
+      text.className = 'task-text';
+      text.textContent = task.text;
+      card.appendChild(text);
+
+      const controls = document.createElement('div');
+      controls.className = 'task-controls';
+
+      const idx = STATUSES.indexOf(task.status);
+      if (idx > 0) {
+        const back = document.createElement('button');
+        back.className = 'mini-btn';
+        back.type = 'button';
+        back.textContent = '←';
+        back.setAttribute('aria-label', 'Mover a la columna anterior');
+        back.onclick = () => moveTask(task.id, STATUSES[idx - 1]);
+        controls.appendChild(back);
+      }
+      if (idx < STATUSES.length - 1) {
+        const fwd = document.createElement('button');
+        fwd.className = 'mini-btn';
+        fwd.type = 'button';
+        fwd.textContent = '→';
+        fwd.setAttribute('aria-label', 'Mover a la siguiente columna');
+        fwd.onclick = () => moveTask(task.id, STATUSES[idx + 1]);
+        controls.appendChild(fwd);
+      }
+      const del = document.createElement('button');
+      del.className = 'mini-btn mini-btn-del';
+      del.type = 'button';
+      del.textContent = '✕';
+      del.setAttribute('aria-label', 'Eliminar tarea');
+      del.onclick = () => deleteTask(task.id);
+      controls.appendChild(del);
+
+      card.appendChild(controls);
+
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer?.setData('text/plain', task.id);
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+      return card;
+    }
+
+    function renderBoard() {
+      for (const status of STATUSES) {
+        const col = document.getElementById(`col-${status}`);
+        const count = document.getElementById(`count-${status}`);
+        if (!col || !count) continue;
+        col.innerHTML = '';
+        const items = tasks.filter((t) => t.status === status);
+        count.textContent = String(items.length);
+        if (items.length === 0) {
+          const empty = document.createElement('p');
+          empty.className = 'mono empty-hint';
+          empty.textContent = status === 'todo' ? 'Todo despejado por ahora.' : '—';
+          col.appendChild(empty);
+        }
+        items.forEach((t) => col.appendChild(makeCard(t)));
+      }
+    }
+
+    function moveTask(id: string, status: Status) {
+      tasks = tasks.map((t) => (t.id === id ? { ...t, status } : t));
+      save(tasks);
+      renderBoard();
+    }
+
+    function deleteTask(id: string) {
+      tasks = tasks.filter((t) => t.id !== id);
+      save(tasks);
+      renderBoard();
+    }
+
+    function addTask(text: string, priority: 'normal' | 'alta') {
+      tasks.push({ id: crypto.randomUUID(), text, priority, status: 'todo' });
+      save(tasks);
+      renderBoard();
+    }
+
+    // Drag and drop wiring
+    document.querySelectorAll<HTMLElement>('.column-body').forEach((col) => {
+      col.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        col.classList.add('drag-over');
+      });
+      col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+      col.addEventListener('drop', (e) => {
+        e.preventDefault();
+        col.classList.remove('drag-over');
+        const id = e.dataTransfer?.getData('text/plain');
+        const status = col.dataset.status as Status;
+        if (id && status) moveTask(id, status);
+      });
+    });
+
+    const form = document.getElementById('add-form') as HTMLFormElement;
+    const input = document.getElementById('add-input') as HTMLInputElement;
+    const prioritySelect = document.getElementById('add-priority') as HTMLSelectElement;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      addTask(text, prioritySelect.value as 'normal' | 'alta');
+      input.value = '';
+      input.focus();
+    });
+
+    async function init() {
+      tasks = await load();
+      renderBoard();
+    }
+    init();
+    window.addEventListener('acm:auth', (e) => {
+      if ((e as CustomEvent).detail?.authenticated) init();
+    });
+  </script>
+
+  <style>
+    .intro { padding: 24px 0 4px; max-width: 60ch; }
+    .intro h1 { font-size: 1.8rem; margin-bottom: 10px; }
+    .intro p { color: var(--ink-dim); }
+
+    .add-form {
+      display: flex;
+      gap: 10px;
+      padding: 16px;
+      margin: 20px 0 28px;
+      flex-wrap: wrap;
+    }
+    .add-form input[type="text"] { flex: 1 1 260px; }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 800px) {
+      .board { grid-template-columns: 1fr; }
+    }
+    .column {
+      background: var(--panel);
+      border: 1px solid var(--panel-line);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      min-height: 280px;
+    }
+    .column-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--panel-line);
+    }
+    .col-tag { color: var(--telemetry); font-size: 0.72rem; }
+    .column-head h2 { font-size: 0.95rem; flex: 1; }
+    .count {
+      font-size: 0.7rem;
+      color: var(--ink-dim);
+      background: var(--void-2);
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+    .column-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      transition: background 0.15s ease;
+    }
+    .column-body.drag-over { background: rgba(95, 212, 208, 0.06); }
+    .empty-hint { color: var(--ink-dim); font-size: 0.75rem; padding: 8px 4px; }
+
+    .task-card {
+      background: var(--void-2);
+      border: 1px solid var(--panel-line);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      cursor: grab;
+    }
+    .task-card.dragging { opacity: 0.5; }
+    .task-card.priority-alta { border-left: 3px solid var(--flame); }
+    .task-text { font-size: 0.88rem; margin-bottom: 8px; word-break: break-word; }
+    .task-controls { display: flex; gap: 6px; justify-content: flex-end; }
+    .mini-btn {
+      background: none;
+      border: 1px solid var(--panel-line);
+      color: var(--ink-dim);
+      border-radius: 6px;
+      width: 26px;
+      height: 24px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .mini-btn:hover { color: var(--telemetry); border-color: var(--telemetry); }
+    .mini-btn-del:hover { color: var(--flame); border-color: var(--flame); }
+  </style>
+</Layout>
