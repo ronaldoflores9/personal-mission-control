@@ -221,22 +221,22 @@ import Layout from '../layouts/Layout.astro';
     .column-body.drag-over { background: rgba(255,255,255,0.04); }
     .empty-hint { color: var(--ink-dim); font-size: 0.75rem; padding: 8px 4px; }
 
-    .task-card {
+    :global(.task-card) {
       position: relative;
       border-radius: 10px;
       padding: 14px 36px 14px 16px;
       cursor: grab;
       transition: transform 0.12s ease, box-shadow 0.12s ease;
     }
-    .task-card:active { cursor: grabbing; }
-    .task-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
-    .task-card.dragging { opacity: 0.45; transform: scale(0.95); }
+    :global(.task-card:active) { cursor: grabbing; }
+    :global(.task-card:hover) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+    :global(.task-card.dragging) { opacity: 0.45; transform: scale(0.95); }
 
-    .task-card[data-status="todo"]  { background: #dc2626; }
-    .task-card[data-status="doing"] { background: #ca8a04; }
-    .task-card[data-status="done"]  { background: #16a34a; }
+    :global(.task-card[data-status="todo"])  { background: #dc2626; }
+    :global(.task-card[data-status="doing"]) { background: #ca8a04; }
+    :global(.task-card[data-status="done"])  { background: #16a34a; }
 
-    .task-text {
+    :global(.task-text) {
       font-size: 0.9rem;
       font-weight: 600;
       color: #fff;
@@ -244,7 +244,7 @@ import Layout from '../layouts/Layout.astro';
       line-height: 1.45;
       margin: 0;
     }
-    .del-btn {
+    :global(.del-btn) {
       position: absolute;
       top: 8px;
       right: 8px;
@@ -263,7 +263,7 @@ import Layout from '../layouts/Layout.astro';
       opacity: 0;
       transition: opacity 0.15s, background 0.15s;
     }
-    .task-card:hover .del-btn { opacity: 1; }
-    .del-btn:hover { background: rgba(0,0,0,0.5); color: #fff; }
+    :global(.task-card:hover .del-btn) { opacity: 1; }
+    :global(.del-btn:hover) { background: rgba(0,0,0,0.5); color: #fff; }
   </style>
 </Layout>
