@@ -200,15 +200,16 @@ for (let h = 6; h < 22; h++) {
         const isUrgent = days >= 0 && days <= 3;
 
         const li = document.createElement('li');
-        li.className = 'deadline-item';
-        if (isPast) li.classList.add('past');
+        li.className = 'deadline-item' + (isPast ? ' past' : '') + (isUrgent && !isPast ? ' urgent' : '');
 
-        const timeStr = d.time ? ` · ${d.time}` : '';
+        const timeStr = d.time ? `<span class="dl-time mono">${d.time}</span>` : '';
         li.innerHTML = `
-          <span class="deadline-text">${d.label}</span>
-          <span class="mono deadline-date">${d.date}${timeStr}</span>
-          <span class="mono deadline-countdown ${isUrgent && !isPast ? 'urgent' : ''}">${countdownLabel(days)}</span>
-          <button class="mini-btn mini-btn-del" type="button" aria-label="Eliminar">✕</button>
+          <div class="dl-left">
+            <span class="dl-label">${d.label}</span>
+            <span class="dl-meta mono">${d.date}${timeStr ? ' · ' : ''}${d.time ?? ''}</span>
+          </div>
+          <span class="dl-countdown mono">${countdownLabel(days)}</span>
+          <button class="dl-del" type="button" aria-label="Eliminar">✕</button>
         `;
         li.querySelector('button')!.addEventListener('click', () => {
           deadlines = deadlines.filter(x => x.id !== d.id);
@@ -328,21 +329,33 @@ for (let h = 6; h < 22; h++) {
     }
     .deadline-form input[type="text"] { flex: 1 1 200px; }
 
-    .deadline-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .deadline-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
     .deadline-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
+      gap: 14px;
+      padding: 16px 18px;
       background: var(--panel);
       border: 1px solid var(--panel-line);
+      border-left: 3px solid var(--telemetry);
       border-radius: var(--radius-sm);
+      transition: box-shadow 0.15s, transform 0.15s;
     }
-    .deadline-item.past { opacity: 0.45; }
-    .deadline-text { flex: 1; font-size: 0.9rem; }
-    .deadline-date { color: var(--telemetry); font-size: 0.75rem; }
-    .deadline-countdown { font-size: 0.72rem; color: var(--ink-dim); background: var(--void-2); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-    .deadline-countdown.urgent { color: var(--flame); background: rgba(255,107,53,0.12); }
+    .deadline-item:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+    .deadline-item.past { opacity: 0.4; border-left-color: var(--panel-line); }
+    .deadline-item.urgent { border-left-color: var(--flame); background: rgba(255,107,53,0.06); }
+    .dl-left { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+    .dl-label { font-size: 0.92rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dl-meta { font-size: 0.7rem; color: var(--ink-dim); }
+    .dl-countdown { font-size: 0.7rem; color: var(--telemetry); background: rgba(95,212,208,0.1); padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+    .deadline-item.urgent .dl-countdown { color: var(--flame); background: rgba(255,107,53,0.15); }
+    .deadline-item.past .dl-countdown { color: var(--ink-dim); background: var(--void-2); }
+    .dl-del {
+      background: none; border: none; color: var(--ink-dim); cursor: pointer;
+      font-size: 0.7rem; padding: 4px; border-radius: 4px; opacity: 0; transition: opacity 0.15s;
+    }
+    .deadline-item:hover .dl-del { opacity: 1; }
+    .dl-del:hover { color: var(--flame); }
     .deadline-empty { color: var(--ink-dim); font-size: 0.8rem; padding: 8px 0; }
     .mini-btn {
       background: none;
