@@ -67,44 +67,19 @@ import Layout from '../layouts/Layout.astro';
       card.draggable = true;
       card.dataset.id = task.id;
       card.dataset.status = task.status;
-      if (task.priority === 'alta') card.classList.add('priority-alta');
 
       const text = document.createElement('p');
       text.className = 'task-text';
       text.textContent = task.text;
       card.appendChild(text);
 
-      const controls = document.createElement('div');
-      controls.className = 'task-controls';
-
-      const idx = STATUSES.indexOf(task.status);
-      if (idx > 0) {
-        const back = document.createElement('button');
-        back.className = 'mini-btn';
-        back.type = 'button';
-        back.textContent = '←';
-        back.setAttribute('aria-label', 'Mover a la columna anterior');
-        back.onclick = () => moveTask(task.id, STATUSES[idx - 1]);
-        controls.appendChild(back);
-      }
-      if (idx < STATUSES.length - 1) {
-        const fwd = document.createElement('button');
-        fwd.className = 'mini-btn';
-        fwd.type = 'button';
-        fwd.textContent = '→';
-        fwd.setAttribute('aria-label', 'Mover a la siguiente columna');
-        fwd.onclick = () => moveTask(task.id, STATUSES[idx + 1]);
-        controls.appendChild(fwd);
-      }
       const del = document.createElement('button');
-      del.className = 'mini-btn mini-btn-del';
+      del.className = 'del-btn';
       del.type = 'button';
       del.textContent = '✕';
       del.setAttribute('aria-label', 'Eliminar tarea');
-      del.onclick = () => deleteTask(task.id);
-      controls.appendChild(del);
-
-      card.appendChild(controls);
+      del.onclick = (e) => { e.stopPropagation(); deleteTask(task.id); };
+      card.appendChild(del);
 
       card.addEventListener('dragstart', (e) => {
         e.dataTransfer?.setData('text/plain', task.id);
@@ -247,42 +222,48 @@ import Layout from '../layouts/Layout.astro';
     .empty-hint { color: var(--ink-dim); font-size: 0.75rem; padding: 8px 4px; }
 
     .task-card {
-      border-radius: 8px;
-      padding: 14px 16px;
+      position: relative;
+      border-radius: 10px;
+      padding: 14px 36px 14px 16px;
       cursor: grab;
       transition: transform 0.12s ease, box-shadow 0.12s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
     }
-    .task-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
-    .task-card.dragging { opacity: 0.5; transform: scale(0.96); }
+    .task-card:active { cursor: grabbing; }
+    .task-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+    .task-card.dragging { opacity: 0.45; transform: scale(0.95); }
 
     .task-card[data-status="todo"]  { background: #dc2626; }
     .task-card[data-status="doing"] { background: #ca8a04; }
     .task-card[data-status="done"]  { background: #16a34a; }
 
     .task-text {
-      font-size: 0.92rem;
+      font-size: 0.9rem;
       font-weight: 600;
       color: #fff;
       word-break: break-word;
-      line-height: 1.4;
+      line-height: 1.45;
+      margin: 0;
     }
-    .task-controls { display: flex; gap: 6px; justify-content: flex-end; }
-    .mini-btn {
+    .del-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
       background: rgba(0,0,0,0.2);
-      border: 1px solid rgba(255,255,255,0.25);
-      color: rgba(255,255,255,0.85);
-      border-radius: 6px;
-      width: 26px;
-      height: 24px;
-      font-size: 0.8rem;
+      border: none;
+      color: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 0.65rem;
       cursor: pointer;
       line-height: 1;
-      transition: background 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s, background 0.15s;
     }
-    .mini-btn:hover { background: rgba(0,0,0,0.35); color: #fff; }
-    .mini-btn-del:hover { background: rgba(0,0,0,0.4); }
+    .task-card:hover .del-btn { opacity: 1; }
+    .del-btn:hover { background: rgba(0,0,0,0.5); color: #fff; }
   </style>
 </Layout>
