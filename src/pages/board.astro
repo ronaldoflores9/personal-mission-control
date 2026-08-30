@@ -258,17 +258,21 @@ import Layout from '../layouts/Layout.astro';
 
     /* status colors */
     .task-card[data-status="todo"] {
-      background: rgba(220, 50, 50, 0.15);
-      border-left-color: #dc3232;
+      background: #b91c1c;
+      border-left-color: #fca5a5;
     }
     .task-card[data-status="doing"] {
-      background: rgba(230, 180, 0, 0.15);
-      border-left-color: #e6b400;
+      background: #a16207;
+      border-left-color: #fde047;
     }
     .task-card[data-status="done"] {
-      background: rgba(40, 180, 100, 0.15);
-      border-left-color: #28b464;
+      background: #15803d;
+      border-left-color: #86efac;
     }
+    .task-card .task-text { color: #fff; }
+    .task-card .mini-btn { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); }
+    .task-card .mini-btn:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.6); }
+    .task-card .mini-btn-del:hover { background: rgba(0,0,0,0.3); color: #fca5a5; border-color: #fca5a5; }
 
     /* column header accent */
     .column[data-status="todo"] .column-head { border-bottom-color: rgba(220,50,50,0.35); }
