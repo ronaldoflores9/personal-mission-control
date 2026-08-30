@@ -247,57 +247,42 @@ import Layout from '../layouts/Layout.astro';
     .empty-hint { color: var(--ink-dim); font-size: 0.75rem; padding: 8px 4px; }
 
     .task-card {
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
+      border-radius: 8px;
+      padding: 14px 16px;
       cursor: grab;
-      border-left: 4px solid transparent;
       transition: transform 0.12s ease, box-shadow 0.12s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    .task-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
-    .task-card.dragging { opacity: 0.45; transform: scale(0.97); }
+    .task-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+    .task-card.dragging { opacity: 0.5; transform: scale(0.96); }
 
-    /* status colors */
-    .task-card[data-status="todo"] {
-      background: #b91c1c;
-      border-left-color: #fca5a5;
-    }
-    .task-card[data-status="doing"] {
-      background: #a16207;
-      border-left-color: #fde047;
-    }
-    .task-card[data-status="done"] {
-      background: #15803d;
-      border-left-color: #86efac;
-    }
-    .task-card .task-text { color: #fff; }
-    .task-card .mini-btn { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); }
-    .task-card .mini-btn:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.6); }
-    .task-card .mini-btn-del:hover { background: rgba(0,0,0,0.3); color: #fca5a5; border-color: #fca5a5; }
+    .task-card[data-status="todo"]  { background: #dc2626; }
+    .task-card[data-status="doing"] { background: #ca8a04; }
+    .task-card[data-status="done"]  { background: #16a34a; }
 
-    /* column header accent */
-    .column[data-status="todo"] .column-head { border-bottom-color: rgba(220,50,50,0.35); }
-    .column[data-status="doing"] .column-head { border-bottom-color: rgba(230,180,0,0.35); }
-    .column[data-status="done"] .column-head { border-bottom-color: rgba(40,180,100,0.35); }
-    .column[data-status="todo"] .col-tag { color: #dc3232; }
-    .column[data-status="doing"] .col-tag { color: #e6b400; }
-    .column[data-status="done"] .col-tag { color: #28b464; }
-
-    .task-card.priority-alta { box-shadow: inset 3px 0 0 0 rgba(255,255,255,0.25); }
-    .task-text { font-size: 0.88rem; margin-bottom: 8px; word-break: break-word; color: var(--ink); }
+    .task-text {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #fff;
+      word-break: break-word;
+      line-height: 1.4;
+    }
     .task-controls { display: flex; gap: 6px; justify-content: flex-end; }
     .mini-btn {
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: var(--ink-dim);
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.85);
       border-radius: 6px;
       width: 26px;
       height: 24px;
       font-size: 0.8rem;
       cursor: pointer;
       line-height: 1;
-      transition: background 0.1s, color 0.1s;
+      transition: background 0.1s;
     }
-    .mini-btn:hover { background: rgba(255,255,255,0.14); color: var(--ink); }
-    .mini-btn-del:hover { background: rgba(220,50,50,0.25); color: #ff6b6b; border-color: #dc3232; }
+    .mini-btn:hover { background: rgba(0,0,0,0.35); color: #fff; }
+    .mini-btn-del:hover { background: rgba(0,0,0,0.4); }
   </style>
 </Layout>
