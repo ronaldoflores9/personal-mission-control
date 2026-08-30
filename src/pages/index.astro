@@ -23,11 +23,11 @@ import MissionPatch from '../components/MissionPatch.astro';
 
   <section class="readout panel" id="readout">
     <div class="readout-head">
-      <span class="eyebrow">Próximo lanzamiento</span>
-      <a href="/schedule" class="mono readout-edit">gestionar fechas →</a>
+      <span class="eyebrow">Próximas fechas</span>
+      <a href="/schedule" class="mono readout-edit">ver todas →</a>
     </div>
     <div id="readout-body" class="readout-body">
-      <p class="mono readout-empty">Sin fechas registradas todavía. Agrega tu próximo examen, entrega o lanzamiento en «Horario de vuelo».</p>
+      <p class="mono readout-empty">Sin fechas registradas. Agrégalas en Horario de vuelo.</p>
     </div>
   </section>
 
@@ -57,46 +57,49 @@ import MissionPatch from '../components/MissionPatch.astro';
   <script>
     import { getItem } from '../lib/store';
 
-    type Deadline = { id: string; label: string; date: string };
+    type Deadline = { id: string; label: string; date: string; time?: string };
     const KEY = 'acm.deadlines';
+
+    function daysUntil(dateStr: string) {
+      const target = new Date(dateStr + 'T00:00:00').getTime();
+      const today = new Date(); today.setHours(0,0,0,0);
+      return Math.ceil((target - today.getTime()) / 86_400_000);
+    }
+
+    function badge(days: number) {
+      if (days < 0)  return { text: `hace ${Math.abs(days)}d`, cls: 'past' };
+      if (days === 0) return { text: '¡hoy!',    cls: 'today' };
+      if (days === 1) return { text: 'mañana',   cls: 'soon' };
+      if (days <= 7)  return { text: `en ${days} días`, cls: 'soon' };
+      return           { text: `en ${days} días`, cls: 'future' };
+    }
 
     async function render() {
       const body = document.getElementById('readout-body');
       if (!body) return;
       const all = await getItem<Deadline[]>(KEY, []);
-      const deadlines = all
-        .filter((d) => new Date(d.date + 'T23:59:59').getTime() >= Date.now())
-        .sort((a, b) => a.date.localeCompare(b.date));
+      const upcoming = all
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(0, 4);
 
-      if (deadlines.length === 0) {
-        body.innerHTML = '<p class="mono readout-empty">Sin fechas registradas todavía. Agrega tu próximo examen, entrega o lanzamiento en «Horario de vuelo».</p>';
+      if (upcoming.length === 0) {
+        body.innerHTML = '<p class="mono readout-empty">Sin fechas registradas. Agrégalas en Horario de vuelo.</p>';
         return;
       }
 
-      const next = deadlines[0];
-      const target = new Date(next.date + 'T23:59:59').getTime();
-
-      function tick() {
-        const diff = Math.max(0, target - Date.now());
-        const days = Math.floor(diff / 86400000);
-        const hours = Math.floor((diff % 86400000) / 3600000);
-        const mins = Math.floor((diff % 3600000) / 60000);
-        const el = document.getElementById('countdown-num');
-        if (el) el.textContent = `T-${days}d ${hours}h ${mins}m`;
-      }
-
-      body.innerHTML = `
-        <div class="countdown-row">
-          <div>
-            <div class="countdown-label">${next.label}</div>
-            <div class="mono countdown-date">${next.date}</div>
-          </div>
-          <div id="countdown-num" class="mono countdown-num">—</div>
-        </div>
-        ${deadlines.length > 1 ? `<p class="mono readout-more">+ ${deadlines.length - 1} fecha(s) más en el horario</p>` : ''}
-      `;
-      tick();
-      setInterval(tick, 60000);
+      body.innerHTML = upcoming.map(d => {
+        const days = daysUntil(d.date);
+        const { text, cls } = badge(days);
+        const time = d.time ? ` · ${d.time}` : '';
+        return `
+          <div class="dl-row">
+            <div class="dl-info">
+              <span class="dl-name">${d.label}</span>
+              <span class="mono dl-date">${d.date}${time}</span>
+            </div>
+            <span class="dl-badge dl-badge--${cls}">${text}</span>
+          </div>`;
+      }).join('');
     }
 
     render();
@@ -134,24 +137,28 @@ import MissionPatch from '../components/MissionPatch.astro';
       justify-content: space-between;
       margin-bottom: 14px;
     }
-    .readout-edit {
-      font-size: 0.72rem;
-      color: var(--ink-dim);
-      text-decoration: none;
-    }
+    .readout-edit { font-size: 0.72rem; color: var(--ink-dim); text-decoration: none; }
     .readout-edit:hover { color: var(--telemetry); }
+    .readout-body { display: flex; flex-direction: column; gap: 10px; }
     .readout-empty { color: var(--ink-dim); font-size: 0.85rem; }
-    .countdown-row {
+
+    :global(.dl-row) {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 10px;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--panel-line);
     }
-    .countdown-label { font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; }
-    .countdown-date { color: var(--ink-dim); font-size: 0.78rem; }
-    .countdown-num { font-size: 1.5rem; color: var(--ion); font-weight: 700; }
-    .readout-more { margin-top: 10px; color: var(--ink-dim); font-size: 0.72rem; }
+    :global(.dl-row:last-child) { border-bottom: none; padding-bottom: 0; }
+    :global(.dl-info) { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    :global(.dl-name) { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+    :global(.dl-date) { font-size: 0.72rem; color: var(--ink-dim); }
+    :global(.dl-badge) { font-family: var(--font-mono); font-size: 0.7rem; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+    :global(.dl-badge--today) { background: rgba(255,107,53,0.15); color: var(--flame); }
+    :global(.dl-badge--soon)  { background: rgba(230,180,0,0.12);  color: #e6b400; }
+    :global(.dl-badge--future){ background: rgba(95,212,208,0.1);  color: var(--telemetry); }
+    :global(.dl-badge--past)  { background: var(--void-2); color: var(--ink-dim); }
 
     .grid {
       display: grid;
