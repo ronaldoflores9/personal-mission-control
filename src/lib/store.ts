@@ -39,9 +39,12 @@ export async function getItem<T>(key: string, fallback: T): Promise<T> {
 
 export async function setItem(key: string, value: unknown): Promise<void> {
   const userId = await currentUserId();
-  if (!userId) return;
+  if (!userId) {
+    console.error('[store] setItem: no userId — data not saved for key:', key);
+    return;
+  }
 
-  await supabase.from(TABLE).upsert(
+  const { error } = await supabase.from(TABLE).upsert(
     {
       user_id: userId,
       key,
@@ -50,4 +53,6 @@ export async function setItem(key: string, value: unknown): Promise<void> {
     },
     { onConflict: 'user_id,key' }
   );
+
+  if (error) console.error('[store] setItem error:', error.message, '| key:', key);
 }

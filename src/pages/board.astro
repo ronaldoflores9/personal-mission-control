@@ -66,6 +66,7 @@ import Layout from '../layouts/Layout.astro';
       card.className = 'task-card';
       card.draggable = true;
       card.dataset.id = task.id;
+      card.dataset.status = task.status;
       if (task.priority === 'alta') card.classList.add('priority-alta');
 
       const text = document.createElement('p');
@@ -242,23 +243,47 @@ import Layout from '../layouts/Layout.astro';
       flex: 1;
       transition: background 0.15s ease;
     }
-    .column-body.drag-over { background: rgba(95, 212, 208, 0.06); }
+    .column-body.drag-over { background: rgba(255,255,255,0.04); }
     .empty-hint { color: var(--ink-dim); font-size: 0.75rem; padding: 8px 4px; }
 
     .task-card {
-      background: var(--void-2);
-      border: 1px solid var(--panel-line);
       border-radius: var(--radius-sm);
-      padding: 10px 12px;
+      padding: 12px 14px;
       cursor: grab;
+      border-left: 4px solid transparent;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
     }
-    .task-card.dragging { opacity: 0.5; }
-    .task-card.priority-alta { border-left: 3px solid var(--flame); }
-    .task-text { font-size: 0.88rem; margin-bottom: 8px; word-break: break-word; }
+    .task-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+    .task-card.dragging { opacity: 0.45; transform: scale(0.97); }
+
+    /* status colors */
+    .task-card[data-status="todo"] {
+      background: rgba(220, 50, 50, 0.15);
+      border-left-color: #dc3232;
+    }
+    .task-card[data-status="doing"] {
+      background: rgba(230, 180, 0, 0.15);
+      border-left-color: #e6b400;
+    }
+    .task-card[data-status="done"] {
+      background: rgba(40, 180, 100, 0.15);
+      border-left-color: #28b464;
+    }
+
+    /* column header accent */
+    .column[data-status="todo"] .column-head { border-bottom-color: rgba(220,50,50,0.35); }
+    .column[data-status="doing"] .column-head { border-bottom-color: rgba(230,180,0,0.35); }
+    .column[data-status="done"] .column-head { border-bottom-color: rgba(40,180,100,0.35); }
+    .column[data-status="todo"] .col-tag { color: #dc3232; }
+    .column[data-status="doing"] .col-tag { color: #e6b400; }
+    .column[data-status="done"] .col-tag { color: #28b464; }
+
+    .task-card.priority-alta { box-shadow: inset 3px 0 0 0 rgba(255,255,255,0.25); }
+    .task-text { font-size: 0.88rem; margin-bottom: 8px; word-break: break-word; color: var(--ink); }
     .task-controls { display: flex; gap: 6px; justify-content: flex-end; }
     .mini-btn {
-      background: none;
-      border: 1px solid var(--panel-line);
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
       color: var(--ink-dim);
       border-radius: 6px;
       width: 26px;
@@ -266,8 +291,9 @@ import Layout from '../layouts/Layout.astro';
       font-size: 0.8rem;
       cursor: pointer;
       line-height: 1;
+      transition: background 0.1s, color 0.1s;
     }
-    .mini-btn:hover { color: var(--telemetry); border-color: var(--telemetry); }
-    .mini-btn-del:hover { color: var(--flame); border-color: var(--flame); }
+    .mini-btn:hover { background: rgba(255,255,255,0.14); color: var(--ink); }
+    .mini-btn-del:hover { background: rgba(220,50,50,0.25); color: #ff6b6b; border-color: #dc3232; }
   </style>
 </Layout>
