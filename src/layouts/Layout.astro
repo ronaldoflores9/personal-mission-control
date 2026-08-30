@@ -34,14 +34,16 @@ const path = Astro.url.pathname;
             <span class="brand-line2" id="brand-name">Centro de Mando</span>
           </span>
         </a>
-        <nav class="nav" aria-label="Navegación principal">
-          {nav.map((item) => (
-            <a href={item.href} class:list={['nav-link', { active: path === item.href }]}>
-              {item.label}
-            </a>
-          ))}
-        </nav>
-        <button id="logout-btn" class="logout-btn mono hidden" type="button">Cerrar sesión</button>
+        <div class="nav-end">
+          <nav class="nav" aria-label="Navegación principal">
+            {nav.map((item) => (
+              <a href={item.href} class:list={['nav-link', { active: path === item.href }]}>
+                {item.label}
+              </a>
+            ))}
+          </nav>
+          <button id="logout-btn" class="logout-btn mono hidden" type="button">Cerrar sesión</button>
+        </div>
       </div>
     </header>
 
@@ -214,10 +216,11 @@ const path = Astro.url.pathname;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 16px;
-        padding-top: 14px;
-        padding-bottom: 14px;
-        flex-wrap: wrap;
+        gap: 12px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
       }
       .brand {
         display: flex;
@@ -245,21 +248,28 @@ const path = Astro.url.pathname;
         font-size: 0.68rem;
         color: var(--ink-dim);
       }
+      .nav-end {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
       .nav {
         display: flex;
-        gap: 4px;
-        flex-wrap: wrap;
+        gap: 2px;
+        flex-wrap: nowrap;
       }
       .nav-link {
         font-family: var(--font-mono);
-        font-size: 0.76rem;
-        letter-spacing: 0.03em;
+        font-size: 0.7rem;
+        letter-spacing: 0.02em;
         text-transform: uppercase;
         text-decoration: none;
         color: var(--ink-dim);
-        padding: 8px 12px;
+        padding: 6px 9px;
         border-radius: var(--radius-sm);
         border: 1px solid transparent;
+        white-space: nowrap;
         transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
       }
       .nav-link:hover { color: var(--ink); border-color: var(--panel-line); }
