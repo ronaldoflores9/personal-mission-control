@@ -2,10 +2,24 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 const TABLE = 'app_data';
 
+let cachedUserId: string | null | undefined = undefined;
+
+if (isSupabaseConfigured) {
+  supabase.auth.getSession().then(({ data }) => {
+    cachedUserId = data.session?.user?.id ?? null;
+  });
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    cachedUserId = session?.user?.id ?? null;
+  });
+}
+
 async function currentUserId(): Promise<string | null> {
   if (!isSupabaseConfigured) return null;
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
+  if (cachedUserId !== undefined) return cachedUserId;
+  const { data } = await supabase.auth.getSession();
+  cachedUserId = data.session?.user?.id ?? null;
+  return cachedUserId;
 }
 
 export async function getItem<T>(key: string, fallback: T): Promise<T> {

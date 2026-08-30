@@ -49,16 +49,17 @@ const path = Astro.url.pathname;
     <div id="auth-gate" class="auth-gate hidden">
       <div class="auth-card panel">
         <span class="eyebrow">Acceso</span>
-        <h2>Inicia sesión para continuar</h2>
-        <p class="auth-copy">
-          Escribe tu correo y te mandamos un enlace mágico — sin contraseñas.
-          Tus tareas, horario y notas quedan ligadas solo a tu cuenta.
-        </p>
+        <h2 id="auth-title">Inicia sesión</h2>
         <form id="auth-form" class="auth-form">
           <input id="auth-email" type="email" placeholder="tu@correo.com" required autocomplete="email" />
-          <button type="submit" class="btn btn-flame">Enviar enlace mágico</button>
+          <input id="auth-password" type="password" placeholder="contraseña" required autocomplete="current-password" minlength="6" />
+          <button type="submit" class="btn btn-flame" id="auth-submit">Entrar</button>
         </form>
         <p id="auth-status" class="mono auth-status"></p>
+        <p class="auth-toggle-text">
+          <span id="auth-toggle-label">¿No tienes cuenta?</span>
+          <button type="button" id="auth-toggle" class="auth-toggle-btn">Crear cuenta</button>
+        </p>
       </div>
     </div>
 
@@ -106,19 +107,44 @@ const path = Astro.url.pathname;
           else showGate();
         });
 
+        let isSignUp = false;
+
+        const title = document.getElementById('auth-title')!;
+        const submitBtn = document.getElementById('auth-submit')!;
+        const toggleBtn = document.getElementById('auth-toggle')!;
+        const toggleLabel = document.getElementById('auth-toggle-label')!;
+        const passwordInput = document.getElementById('auth-password') as HTMLInputElement;
+
+        toggleBtn.addEventListener('click', () => {
+          isSignUp = !isSignUp;
+          title.textContent = isSignUp ? 'Crear cuenta' : 'Inicia sesión';
+          submitBtn.textContent = isSignUp ? 'Crear cuenta' : 'Entrar';
+          toggleLabel.textContent = isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?';
+          toggleBtn.textContent = isSignUp ? 'Inicia sesión' : 'Crear cuenta';
+          passwordInput.autocomplete = isSignUp ? 'new-password' : 'current-password';
+          statusEl.textContent = '';
+        });
+
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
-          const emailInput = document.getElementById('auth-email') as HTMLInputElement;
-          const email = emailInput.value.trim();
-          if (!email) return;
-          statusEl.textContent = 'Enviando enlace…';
-          const { error } = await supabase.auth.signInWithOtp({
-            email,
-            options: { emailRedirectTo: window.location.origin },
-          });
-          statusEl.textContent = error
-            ? `Error: ${error.message}`
-            : `Listo — revisa ${email} y abre el enlace para entrar.`;
+          const email = (document.getElementById('auth-email') as HTMLInputElement).value.trim();
+          const password = passwordInput.value;
+          if (!email || !password) return;
+
+          statusEl.textContent = isSignUp ? 'Creando cuenta…' : 'Entrando…';
+          submitBtn.setAttribute('disabled', 'true');
+
+          const { error } = isSignUp
+            ? await supabase.auth.signUp({ email, password })
+            : await supabase.auth.signInWithPassword({ email, password });
+
+          if (error) {
+            statusEl.textContent = `Error: ${error.message}`;
+          } else if (isSignUp) {
+            statusEl.textContent = 'Cuenta creada — ya puedes entrar.';
+          }
+
+          submitBtn.removeAttribute('disabled');
         });
 
         logoutBtn.addEventListener('click', async () => {
@@ -234,6 +260,9 @@ const path = Astro.url.pathname;
       .auth-copy { color: var(--ink-dim); font-size: 0.88rem; margin-bottom: 20px; }
       .auth-form { display: flex; flex-direction: column; gap: 10px; }
       .auth-status { margin-top: 14px; font-size: 0.72rem; color: var(--telemetry); min-height: 1em; }
+      .auth-toggle-text { margin-top: 16px; font-size: 0.78rem; color: var(--ink-dim); }
+      .auth-toggle-btn { background: none; border: none; color: var(--ion); cursor: pointer; font-size: 0.78rem; padding: 0; text-decoration: underline; }
+      .auth-toggle-btn:hover { color: var(--telemetry); }
       .footer {
         border-top: 1px solid var(--panel-line);
         padding-top: 20px;
