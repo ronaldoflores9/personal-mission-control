@@ -1,28 +1,52 @@
 ---
 import Layout from '../layouts/Layout.astro';
+
 const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const hours = ['7-9', '9-11', '11-13', '13-15', '15-17', '17-19', '19-21'];
+
+const slots: string[] = [];
+for (let h = 6; h < 22; h++) {
+  slots.push(`${String(h).padStart(2, '0')}:00`);
+  slots.push(`${String(h).padStart(2, '0')}:30`);
+}
 ---
 <Layout title="Horario de vuelo" eyebrow="Plan semanal">
   <section class="intro">
     <h1>Horario de vuelo</h1>
-    <p>Haz clic en cualquier casilla para anotar clase, laboratorio o práctica de cohetería. Se guarda solo.</p>
+    <p>Agrega clases, laboratorios o cualquier actividad semanal recurrente.</p>
   </section>
+
+  <form id="event-form" class="event-form panel">
+    <input id="ev-name" type="text" placeholder="Nombre — ej. Cálculo II" required />
+    <select id="ev-day">
+      {days.map((d, i) => <option value={i}>{d}</option>)}
+    </select>
+    <div class="time-pair">
+      <select id="ev-start">
+        {slots.map(s => <option value={s}>{s}</option>)}
+      </select>
+      <span class="mono time-sep">→</span>
+      <select id="ev-end">
+        {slots.map(s => <option value={s}>{s}</option>)}
+      </select>
+    </div>
+    <input id="ev-color" type="color" value="#4ea8ff" title="Color del evento" />
+    <button type="submit" class="btn btn-flame">Añadir</button>
+  </form>
 
   <div class="table-wrap panel">
     <table id="schedule-table">
       <thead>
         <tr>
           <th class="corner mono">Hora</th>
-          {days.map((d) => <th class="mono">{d}</th>)}
+          {days.map(d => <th class="mono">{d}</th>)}
         </tr>
       </thead>
       <tbody>
-        {hours.map((h) => (
+        {slots.map(slot => (
           <tr>
-            <td class="hour-label mono">{h}</td>
+            <td class="hour-label mono">{slot}</td>
             {days.map((_, di) => (
-              <td class="cell" data-key={`${h}|${di}`} tabindex="0" role="button" aria-label="Editar celda de horario"></td>
+              <td class="cell" data-slot={slot} data-day={String(di)}></td>
             ))}
           </tr>
         ))}
@@ -32,7 +56,7 @@ const hours = ['7-9', '9-11', '11-13', '13-15', '15-17', '17-19', '19-21'];
 
   <section class="deadlines-section">
     <h2>Fechas importantes</h2>
-    <p class="deadlines-sub">Exámenes, entregas, pruebas de motor, lo que sea. Esto alimenta la cuenta regresiva del centro de mando.</p>
+    <p class="deadlines-sub">Exámenes, entregas, pruebas de motor, lo que sea.</p>
 
     <form id="deadline-form" class="deadline-form panel">
       <input id="deadline-label" type="text" placeholder="ej. Examen de termodinámica" required />
@@ -46,55 +70,105 @@ const hours = ['7-9', '9-11', '11-13', '13-15', '15-17', '17-19', '19-21'];
   <script>
     import { getItem, setItem } from '../lib/store';
 
-    const CELL_KEY = 'acm.schedule';
+    const EVENT_KEY    = 'acm.weeklyEvents';
     const DEADLINE_KEY = 'acm.deadlines';
 
-    // --- Weekly grid ---
-    let cells: Record<string, string> = {};
+    type WeekEvent = { id: string; name: string; day: number; start: string; end: string; color: string };
+    type Deadline  = { id: string; label: string; date: string };
 
-    function saveCells() {
-      void setItem(CELL_KEY, cells);
+    let events:    WeekEvent[] = [];
+    let deadlines: Deadline[]  = [];
+
+    // ── helpers ──────────────────────────────────────────────────────────
+    function toMinutes(t: string) {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
     }
 
-    function wireCells() {
-      document.querySelectorAll<HTMLTableCellElement>('.cell').forEach((cell) => {
-        const key = cell.dataset.key!;
-        cell.textContent = cells[key] || '';
-        cell.classList.toggle('filled', Boolean(cells[key]));
+    function slotInEvent(slot: string, ev: WeekEvent) {
+      return toMinutes(slot) >= toMinutes(ev.start) && toMinutes(slot) < toMinutes(ev.end);
+    }
 
-        const edit = () => {
-          const current = cells[key] || '';
-          const value = prompt('¿Qué hay en esta franja?', current);
-          if (value === null) return;
-          if (value.trim() === '') {
-            delete cells[key];
-            cell.textContent = '';
-            cell.classList.remove('filled');
-          } else {
-            cells[key] = value.trim();
-            cell.textContent = value.trim();
-            cell.classList.add('filled');
-          }
-          saveCells();
-        };
-        cell.onclick = edit;
-        cell.onkeydown = (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            edit();
-          }
-        };
+    function slotIsStart(slot: string, ev: WeekEvent) {
+      return slot === ev.start;
+    }
+
+    // ── grid rendering ────────────────────────────────────────────────────
+    function renderGrid() {
+      document.querySelectorAll<HTMLTableCellElement>('.cell').forEach(cell => {
+        const slot = cell.dataset.slot!;
+        const day  = Number(cell.dataset.day);
+
+        cell.innerHTML = '';
+        cell.style.cssText = '';
+        cell.removeAttribute('data-event-id');
+
+        const ev = events.find(e => e.day === day && slotInEvent(slot, e));
+        if (!ev) return;
+
+        const alpha = slotIsStart(slot, ev) ? '33' : '22';
+        cell.style.background   = ev.color + alpha;
+        cell.style.borderLeft   = `3px solid ${ev.color}`;
+        cell.style.borderBottom = `1px solid ${ev.color}44`;
+        cell.dataset.eventId    = ev.id;
+
+        if (slotIsStart(slot, ev)) {
+          const label = document.createElement('span');
+          label.className   = 'ev-label';
+          label.textContent = ev.name;
+          label.style.color = ev.color;
+          cell.appendChild(label);
+
+          const del = document.createElement('button');
+          del.className   = 'ev-del';
+          del.textContent = '✕';
+          del.title       = 'Eliminar evento';
+          del.onclick = (e) => {
+            e.stopPropagation();
+            events = events.filter(x => x.id !== ev.id);
+            void setItem(EVENT_KEY, events);
+            renderGrid();
+          };
+          cell.appendChild(del);
+        }
       });
     }
 
-    // --- Deadlines ---
-    type Deadline = { id: string; label: string; date: string };
-    function saveDeadlines(list: Deadline[]) {
-      void setItem(DEADLINE_KEY, list);
-    }
+    // ── form ──────────────────────────────────────────────────────────────
+    const evForm  = document.getElementById('event-form') as HTMLFormElement;
+    const evStart = document.getElementById('ev-start') as HTMLSelectElement;
+    const evEnd   = document.getElementById('ev-end')   as HTMLSelectElement;
 
-    let deadlines: Deadline[] = [];
+    evStart.addEventListener('change', () => {
+      const startMin = toMinutes(evStart.value);
+      Array.from(evEnd.options).forEach(opt => {
+        opt.disabled = toMinutes(opt.value) <= startMin;
+      });
+      if (toMinutes(evEnd.value) <= startMin) {
+        const next = Array.from(evEnd.options).find(o => !o.disabled);
+        if (next) evEnd.value = next.value;
+      }
+    });
+    // init end options
+    evStart.dispatchEvent(new Event('change'));
 
+    evForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name  = (document.getElementById('ev-name')  as HTMLInputElement).value.trim();
+      const day   = Number((document.getElementById('ev-day') as HTMLSelectElement).value);
+      const start = evStart.value;
+      const end   = evEnd.value;
+      const color = (document.getElementById('ev-color') as HTMLInputElement).value;
+
+      if (!name || toMinutes(end) <= toMinutes(start)) return;
+
+      events.push({ id: crypto.randomUUID(), name, day, start, end, color });
+      void setItem(EVENT_KEY, events);
+      renderGrid();
+      (document.getElementById('ev-name') as HTMLInputElement).value = '';
+    });
+
+    // ── deadlines ─────────────────────────────────────────────────────────
     function renderDeadlines() {
       const list = document.getElementById('deadline-list')!;
       list.innerHTML = '';
@@ -106,39 +180,39 @@ const hours = ['7-9', '9-11', '11-13', '13-15', '15-17', '17-19', '19-21'];
       for (const d of sorted) {
         const li = document.createElement('li');
         li.className = 'deadline-item';
-        const isPast = new Date(d.date + 'T23:59:59').getTime() < Date.now();
-        if (isPast) li.classList.add('past');
+        if (new Date(d.date + 'T23:59:59').getTime() < Date.now()) li.classList.add('past');
         li.innerHTML = `
           <span class="deadline-text">${d.label}</span>
           <span class="mono deadline-date">${d.date}</span>
-          <button class="mini-btn mini-btn-del" type="button" aria-label="Eliminar fecha">✕</button>
+          <button class="mini-btn mini-btn-del" type="button" aria-label="Eliminar">✕</button>
         `;
         li.querySelector('button')!.addEventListener('click', () => {
-          deadlines = deadlines.filter((x) => x.id !== d.id);
-          saveDeadlines(deadlines);
+          deadlines = deadlines.filter(x => x.id !== d.id);
+          void setItem(DEADLINE_KEY, deadlines);
           renderDeadlines();
         });
         list.appendChild(li);
       }
     }
 
-    const form = document.getElementById('deadline-form') as HTMLFormElement;
-    form.addEventListener('submit', (e) => {
+    const dlForm = document.getElementById('deadline-form') as HTMLFormElement;
+    dlForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const label = (document.getElementById('deadline-label') as HTMLInputElement);
-      const date = (document.getElementById('deadline-date') as HTMLInputElement);
+      const label = document.getElementById('deadline-label') as HTMLInputElement;
+      const date  = document.getElementById('deadline-date')  as HTMLInputElement;
       if (!label.value.trim() || !date.value) return;
       deadlines.push({ id: crypto.randomUUID(), label: label.value.trim(), date: date.value });
-      saveDeadlines(deadlines);
+      void setItem(DEADLINE_KEY, deadlines);
       label.value = '';
-      date.value = '';
+      date.value  = '';
       renderDeadlines();
     });
 
+    // ── init ──────────────────────────────────────────────────────────────
     async function init() {
-      cells = await getItem<Record<string, string>>(CELL_KEY, {});
-      wireCells();
+      events    = await getItem<WeekEvent[]>(EVENT_KEY, []);
       deadlines = await getItem<Deadline[]>(DEADLINE_KEY, []);
+      renderGrid();
       renderDeadlines();
     }
     init();
@@ -152,27 +226,69 @@ const hours = ['7-9', '9-11', '11-13', '13-15', '15-17', '17-19', '19-21'];
     .intro h1 { font-size: 1.8rem; margin-bottom: 10px; }
     .intro p { color: var(--ink-dim); }
 
+    .event-form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px;
+      margin: 20px 0 24px;
+      flex-wrap: wrap;
+    }
+    .event-form input[type="text"] { flex: 1 1 200px; }
+    .time-pair { display: flex; align-items: center; gap: 6px; }
+    .time-sep { color: var(--ink-dim); font-size: 0.8rem; }
+    #ev-color { width: 38px; height: 38px; padding: 2px; border-radius: 6px; border: 1px solid var(--panel-line); background: none; cursor: pointer; }
+
     .table-wrap {
-      margin: 20px 0 40px;
+      margin: 0 0 40px;
       overflow-x: auto;
       padding: 8px;
     }
     table { border-collapse: collapse; width: 100%; min-width: 640px; }
-    th, td { padding: 8px 10px; text-align: left; border: 1px solid var(--panel-line); }
-    th { font-size: 0.68rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    th, td { padding: 4px 8px; text-align: left; border: 1px solid var(--panel-line); }
+    th { font-size: 0.68rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; background: var(--void-2); }
     .corner { color: var(--telemetry); }
-    .hour-label { font-size: 0.7rem; color: var(--ink-dim); white-space: nowrap; }
+    .hour-label { font-size: 0.65rem; color: var(--ink-dim); white-space: nowrap; width: 48px; }
     .cell {
-      cursor: pointer;
-      font-size: 0.78rem;
-      min-width: 96px;
-      height: 44px;
-      vertical-align: middle;
-      transition: background 0.15s ease;
+      height: 28px;
+      min-width: 90px;
+      vertical-align: top;
+      position: relative;
+      transition: background 0.1s;
     }
-    .cell:hover { background: var(--void-2); }
-    .cell.filled { background: rgba(95, 212, 208, 0.08); color: var(--ink); }
+    .cell:hover { background: rgba(255,255,255,0.03); }
 
+    :global(.ev-label) {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 4px 22px 0 4px;
+      line-height: 1.2;
+    }
+    :global(.ev-del) {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      background: rgba(0,0,0,0.3);
+      border: none;
+      color: rgba(255,255,255,0.5);
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      font-size: 0.55rem;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    :global(.cell:hover .ev-del) { display: flex; }
+    :global(.ev-del:hover) { background: rgba(0,0,0,0.6); color: #fff; }
+
+    .deadlines-section { margin-top: 8px; }
     .deadlines-section h2 { font-size: 1.2rem; margin-bottom: 6px; }
     .deadlines-sub { color: var(--ink-dim); font-size: 0.85rem; margin-bottom: 16px; }
 
