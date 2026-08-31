@@ -56,17 +56,22 @@ const path = Astro.url.pathname;
           <span></span>
         </button>
       </div>
-      <nav class="mobile-nav" id="mobile-nav" aria-label="Menú móvil" aria-hidden="true">
-        <div class="wrap mobile-nav-inner">
+    </header>
+
+    <!-- Full-screen mobile nav overlay -->
+    <div class="mobile-overlay" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Menú">
+      <div class="mobile-overlay-inner">
+        <nav class="mobile-overlay-nav">
           {nav.map((item) => (
-            <a href={item.href} class:list={['mobile-nav-link', { active: path === item.href }]}>
+            <a href={item.href} class:list={['mobile-overlay-link', { active: path === item.href }]}>
+              <span class="mobile-overlay-link-num">✦</span>
               {item.label}
             </a>
           ))}
-          <button id="mobile-logout-btn" class="mobile-logout-btn mono hidden" type="button">Cerrar sesión</button>
-        </div>
-      </nav>
-    </header>
+        </nav>
+        <button id="mobile-logout-btn" class="mobile-logout-btn mono hidden" type="button">Cerrar sesión</button>
+      </div>
+    </div>
 
     <div id="auth-gate" class="auth-gate hidden">
       <div class="auth-card panel">
@@ -116,22 +121,32 @@ const path = Astro.url.pathname;
       const nameForm        = document.getElementById('name-form') as HTMLFormElement;
       const brandName       = document.getElementById('brand-name')!;
 
-      // Hamburger menu
+      // Hamburger menu overlay
       const hamburgerBtn = document.getElementById('hamburger-btn')!;
       const mobileNav    = document.getElementById('mobile-nav')!;
+
+      function openMenu() {
+        mobileNav.classList.add('open');
+        hamburgerBtn.classList.add('open');
+        hamburgerBtn.setAttribute('aria-expanded', 'true');
+        mobileNav.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+      }
+      function closeMenu() {
+        mobileNav.classList.remove('open');
+        hamburgerBtn.classList.remove('open');
+        hamburgerBtn.setAttribute('aria-expanded', 'false');
+        mobileNav.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+      }
+
       hamburgerBtn.addEventListener('click', () => {
-        const isOpen = mobileNav.classList.toggle('open');
-        hamburgerBtn.classList.toggle('open', isOpen);
-        hamburgerBtn.setAttribute('aria-expanded', String(isOpen));
-        mobileNav.setAttribute('aria-hidden', String(!isOpen));
+        mobileNav.classList.contains('open') ? closeMenu() : openMenu();
       });
-      mobileNav.querySelectorAll('a').forEach(link => {
-        link.addEventListener('click', () => {
-          mobileNav.classList.remove('open');
-          hamburgerBtn.classList.remove('open');
-          hamburgerBtn.setAttribute('aria-expanded', 'false');
-          mobileNav.setAttribute('aria-hidden', 'true');
-        });
+      mobileNav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+      // close on backdrop tap
+      mobileNav.addEventListener('click', (e) => {
+        if (e.target === mobileNav) closeMenu();
       });
 
       async function loadAndSetName() {
@@ -322,7 +337,7 @@ const path = Astro.url.pathname;
         background: var(--panel);
       }
 
-      /* Hamburger button — hidden on desktop */
+      /* Hamburger button — always hidden on desktop */
       .hamburger {
         display: none;
         flex-direction: column;
@@ -335,64 +350,94 @@ const path = Astro.url.pathname;
         cursor: pointer;
         flex-shrink: 0;
         touch-action: manipulation;
+        z-index: 110;
+        position: relative;
       }
       .hamburger span {
         display: block;
         width: 18px;
         height: 2px;
         background: var(--ink-dim);
-        transition: transform 0.22s ease, opacity 0.22s ease;
+        transition: transform 0.25s ease, opacity 0.25s ease, background 0.25s ease;
       }
-      .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); background: var(--ink); }
-      .hamburger.open span:nth-child(2) { opacity: 0; }
-      .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); background: var(--ink); }
+      .hamburger.open span { background: var(--ink); }
+      .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+      .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+      .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-      /* Mobile nav drawer — hidden by default */
-      .mobile-nav {
+      /* Full-screen mobile overlay */
+      .mobile-overlay {
         display: none;
-        overflow: hidden;
-        border-top: 1px solid var(--panel-line);
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: rgba(11, 18, 32, 0.97);
+        backdrop-filter: blur(16px);
+        opacity: 0;
+        transition: opacity 0.25s ease;
       }
-      .mobile-nav.open { display: block; }
-      .mobile-nav-inner {
+      .mobile-overlay.open {
+        display: flex;
+        opacity: 1;
+      }
+      .mobile-overlay-inner {
         display: flex;
         flex-direction: column;
-        padding-top: 8px;
-        padding-bottom: 16px;
-        gap: 2px;
+        justify-content: center;
+        align-items: flex-start;
+        width: 100%;
+        padding: 80px 36px 60px;
+        gap: 4px;
       }
-      .mobile-nav-link {
-        font-family: var(--font-mono);
-        font-size: 0.78rem;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+      .mobile-overlay-nav {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        gap: 2px;
+        margin-bottom: 40px;
+      }
+      .mobile-overlay-link {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-family: var(--font-display);
+        font-size: 1.6rem;
+        font-weight: 600;
         text-decoration: none;
         color: var(--ink-dim);
-        padding: 13px 4px;
-        border-bottom: 1px solid rgba(36, 49, 77, 0.5);
-        display: block;
+        padding: 14px 0;
+        border-bottom: 1px solid rgba(36, 49, 77, 0.4);
+        transition: color 0.15s ease;
         touch-action: manipulation;
+        letter-spacing: -0.01em;
       }
-      .mobile-nav-link:last-of-type { border-bottom: none; }
-      .mobile-nav-link.active { color: var(--telemetry); }
-      .mobile-logout-btn {
+      .mobile-overlay-link:last-child { border-bottom: none; }
+      .mobile-overlay-link.active { color: var(--ion); }
+      .mobile-overlay-link:active { color: var(--telemetry); }
+      .mobile-overlay-link-num {
+        font-family: var(--font-mono);
         font-size: 0.7rem;
-        letter-spacing: 0.04em;
+        color: var(--telemetry);
+        opacity: 0.6;
+      }
+      .mobile-overlay-link.active .mobile-overlay-link-num { opacity: 1; }
+      .mobile-logout-btn {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
         background: none;
         border: 1px solid var(--panel-line);
         color: var(--ink-dim);
         border-radius: var(--radius-sm);
-        padding: 12px 16px;
+        padding: 14px 20px;
         cursor: pointer;
-        margin-top: 10px;
-        width: 100%;
-        font-family: var(--font-mono);
         touch-action: manipulation;
+        align-self: flex-start;
       }
-      .mobile-logout-btn:hover { color: var(--flame); border-color: var(--flame); }
+      .mobile-logout-btn:active { color: var(--flame); border-color: var(--flame); }
 
-      @media (max-width: 720px) {
+      @media (max-width: 780px) {
         .nav-end { display: none; }
         .hamburger { display: flex; }
       }
