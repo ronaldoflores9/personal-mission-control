@@ -355,68 +355,6 @@ for (let h = 6; h < 22; h++) {
     :global(.dl-del:hover) { color: var(--flame); }
     .deadline-empty { color: var(--ink-dim); font-size: 0.8rem; padding: 8px 0; }
 
-    /* ── MobileSchedule React component styles ──────────────────────── */
-    :global(.ms-root) { display: flex; flex-direction: column; gap: 12px; }
-
-    :global(.ms-tabs) {
-      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
-      scrollbar-width: none;
-    }
-    :global(.ms-tabs::-webkit-scrollbar) { display: none; }
-
-    :global(.ms-tab) {
-      font-family: var(--font-mono); font-size: 0.72rem;
-      text-transform: uppercase; letter-spacing: 0.06em;
-      padding: 10px 16px; border-radius: 999px;
-      border: 1px solid var(--panel-line); background: var(--void-2);
-      color: var(--ink-dim); cursor: pointer; white-space: nowrap;
-      flex-shrink: 0; touch-action: manipulation;
-      position: relative;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
-    }
-    :global(.ms-tab--active) {
-      color: var(--void); background: var(--telemetry);
-      border-color: var(--telemetry); font-weight: 700;
-    }
-    :global(.ms-tab--today:not(.ms-tab--active)) { border-color: var(--ion); color: var(--ion); }
-    :global(.ms-today-dot) {
-      position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
-      width: 4px; height: 4px; border-radius: 50%; background: currentColor;
-    }
-
-    :global(.ms-day-label) { display: flex; align-items: center; gap: 10px; }
-    :global(.ms-day-name) { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em; }
-    :global(.ms-today-badge) {
-      font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase;
-      background: rgba(78,168,255,0.15); color: var(--ion);
-      padding: 2px 8px; border-radius: 999px; letter-spacing: 0.06em;
-    }
-
-    :global(.ms-events) { display: flex; flex-direction: column; gap: 10px; }
-    :global(.ms-empty) { font-family: var(--font-mono); color: var(--ink-dim); font-size: 0.82rem; padding: 24px 0; text-align: center; }
-
-    :global(.ms-card) {
-      display: flex; align-items: center; gap: 14px;
-      padding: 16px 18px; border: 1px solid var(--panel-line);
-      border-left: 4px solid; border-radius: var(--radius-sm);
-    }
-    :global(.ms-card-time) {
-      font-family: var(--font-mono); font-size: 0.72rem;
-      color: var(--ink-dim); white-space: nowrap; flex-shrink: 0;
-    }
-    :global(.ms-card-name) { font-size: 0.95rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
-    :global(.ms-card-del) {
-      background: none; border: none; color: var(--ink-dim); cursor: pointer;
-      touch-action: manipulation; flex-shrink: 0;
-      min-width: 40px; min-height: 40px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.75rem; border-radius: 6px;
-    }
-    :global(.ms-card-del:active) { color: var(--flame); }
-    :global(.ms-swipe-hint) {
-      font-family: var(--font-mono); font-size: 0.62rem;
-      color: var(--ink-dim); text-align: center;
-      opacity: 0.5; letter-spacing: 0.04em;
-    }
+    /* MobileSchedule styles live in MobileSchedule.module.css */
   </style>
 </Layout>
