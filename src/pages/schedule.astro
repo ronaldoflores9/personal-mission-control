@@ -1,9 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import MobileSchedule from '../components/MobileSchedule';
 
-const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const daysFull = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-
+const days  = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const slots: string[] = [];
 for (let h = 6; h < 22; h++) {
   slots.push(`${String(h).padStart(2, '0')}:00`);
@@ -56,83 +55,70 @@ for (let h = 6; h < 22; h++) {
     </div>
   </form>
 
-  <!-- ── Vista por día (solo móvil) ────────────────────────────────── -->
-  <div class="day-view" id="day-view">
-    <div class="day-tabs" id="day-tabs" role="tablist">
-      {days.map((d, i) => (
-        <button class="day-tab" data-day={i} type="button" role="tab">{d}</button>
-      ))}
-    </div>
-    <div class="day-title-row">
-      <span class="day-title-label mono" id="day-title-label"></span>
-    </div>
-    <div class="day-events" id="day-events"></div>
+  <!-- ── Mobile: React component (hidden on desktop via CSS) ───────── -->
+  <div class="mobile-only">
+    <MobileSchedule client:load />
   </div>
 
-  <!-- ── Tabla semanal (solo desktop) ──────────────────────────────── -->
-  <div class="table-section">
-    <div class="table-wrap panel">
-      <table id="schedule-table">
-        <thead>
+  <!-- ── Desktop: tabla semanal (hidden on mobile via CSS) ─────────── -->
+  <div class="desktop-only table-wrap panel">
+    <table id="schedule-table">
+      <thead>
+        <tr>
+          <th class="corner mono">Hora</th>
+          {days.map(d => <th class="mono">{d}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {slots.map(slot => (
           <tr>
-            <th class="corner mono">Hora</th>
-            {days.map(d => <th class="mono">{d}</th>)}
+            <td class="hour-label mono">{slot}</td>
+            {days.map((_, di) => (
+              <td class="cell" data-slot={slot} data-day={String(di)}></td>
+            ))}
           </tr>
-        </thead>
-        <tbody>
-          {slots.map(slot => (
-            <tr>
-              <td class="hour-label mono">{slot}</td>
-              {days.map((_, di) => (
-                <td class="cell" data-slot={slot} data-day={String(di)}></td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table>
   </div>
 
   <script>
     import { getItem, setItem } from '../lib/store';
 
+    type WeekEvent = { id: string; name: string; day: number; start: string; end: string; color: string };
+    type Deadline  = { id: string; label: string; date: string; time?: string };
+
     const EVENT_KEY    = 'acm.weeklyEvents';
     const DEADLINE_KEY = 'acm.deadlines';
 
-    const daysFull = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-
-    let events    = [];
-    let deadlines = [];
+    let events:    WeekEvent[] = [];
+    let deadlines: Deadline[]  = [];
 
     // ── helpers ───────────────────────────────────────────────────────
-    function toMinutes(t) {
+    function toMinutes(t: string) {
       const [h, m] = t.split(':').map(Number);
       return h * 60 + m;
     }
-    function slotInEvent(slot, ev) {
-      return toMinutes(slot) >= toMinutes(ev.start) && toMinutes(slot) < toMinutes(ev.end);
-    }
-    function slotIsStart(slot, ev) { return slot === ev.start; }
 
     // ── desktop grid ──────────────────────────────────────────────────
     function renderGrid() {
-      document.querySelectorAll('.cell').forEach(cell => {
-        const slot = cell.dataset.slot;
+      document.querySelectorAll<HTMLTableCellElement>('.cell').forEach(cell => {
+        const slot = cell.dataset.slot!;
         const day  = Number(cell.dataset.day);
         cell.innerHTML = '';
         cell.style.cssText = '';
         cell.removeAttribute('data-event-id');
 
-        const ev = events.find(e => e.day === day && slotInEvent(slot, e));
+        const ev = events.find(e => e.day === day && toMinutes(slot) >= toMinutes(e.start) && toMinutes(slot) < toMinutes(e.end));
         if (!ev) return;
 
-        const alpha = slotIsStart(slot, ev) ? '33' : '22';
-        cell.style.background   = ev.color + alpha;
+        const isStart = slot === ev.start;
+        cell.style.background   = ev.color + (isStart ? '33' : '22');
         cell.style.borderLeft   = `3px solid ${ev.color}`;
         cell.style.borderBottom = `1px solid ${ev.color}44`;
         cell.dataset.eventId    = ev.id;
 
-        if (slotIsStart(slot, ev)) {
+        if (isStart) {
           const label = document.createElement('span');
           label.className   = 'ev-label';
           label.textContent = ev.name;
@@ -148,72 +134,24 @@ for (let h = 6; h < 22; h++) {
             events = events.filter(x => x.id !== ev.id);
             void setItem(EVENT_KEY, events);
             renderGrid();
-            renderDayView();
+            // Notify React mobile component
+            window.dispatchEvent(new CustomEvent('acm:events-updated'));
           };
           cell.appendChild(del);
         }
       });
     }
 
-    // ── mobile day view ───────────────────────────────────────────────
-    let selectedDay = (new Date().getDay() + 6) % 7; // JS 0=Sun → our 0=Mon
-
-    function renderDayView() {
-      const container = document.getElementById('day-events');
-      const titleEl   = document.getElementById('day-title-label');
-      if (!container || !titleEl) return;
-
-      titleEl.textContent = daysFull[selectedDay];
-
-      const dayEvents = events
-        .filter(e => e.day === selectedDay)
-        .sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
-
-      if (dayEvents.length === 0) {
-        container.innerHTML = '<p class="day-empty mono">Sin clases este día.</p>';
-        return;
-      }
-
-      container.innerHTML = '';
-      dayEvents.forEach(ev => {
-        const card = document.createElement('div');
-        card.className = 'day-event-card';
-        card.style.borderLeftColor = ev.color;
-        card.style.background = ev.color + '18';
-
-        card.innerHTML = `
-          <div class="day-event-time mono">${ev.start} → ${ev.end}</div>
-          <div class="day-event-name">${ev.name}</div>
-          <button class="day-event-del" type="button" aria-label="Eliminar">✕</button>
-        `;
-        card.querySelector('.day-event-del').addEventListener('click', () => {
-          events = events.filter(x => x.id !== ev.id);
-          void setItem(EVENT_KEY, events);
-          renderGrid();
-          renderDayView();
-        });
-        container.appendChild(card);
-      });
-    }
-
-    // Day tabs
-    function setActiveTab(day) {
-      selectedDay = day;
-      document.querySelectorAll('.day-tab').forEach((btn, i) => {
-        btn.classList.toggle('active', i === day);
-      });
-      renderDayView();
-    }
-
-    document.querySelectorAll('.day-tab').forEach((btn, i) => {
-      btn.addEventListener('click', () => setActiveTab(i));
+    // Reload grid when React component deletes an event
+    window.addEventListener('acm:events-updated', async () => {
+      events = await getItem<WeekEvent[]>(EVENT_KEY, []);
+      renderGrid();
     });
-    setActiveTab(selectedDay);
 
     // ── event form ────────────────────────────────────────────────────
-    const evForm  = document.getElementById('event-form');
-    const evStart = document.getElementById('ev-start');
-    const evEnd   = document.getElementById('ev-end');
+    const evForm  = document.getElementById('event-form') as HTMLFormElement;
+    const evStart = document.getElementById('ev-start') as HTMLSelectElement;
+    const evEnd   = document.getElementById('ev-end')   as HTMLSelectElement;
 
     evStart.addEventListener('change', () => {
       const startMin = toMinutes(evStart.value);
@@ -229,35 +167,35 @@ for (let h = 6; h < 22; h++) {
 
     evForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const name  = document.getElementById('ev-name').value.trim();
-      const day   = Number(document.getElementById('ev-day').value);
+      const name  = (document.getElementById('ev-name')  as HTMLInputElement).value.trim();
+      const day   = Number((document.getElementById('ev-day') as HTMLSelectElement).value);
       const start = evStart.value;
       const end   = evEnd.value;
-      const color = document.getElementById('ev-color').value;
+      const color = (document.getElementById('ev-color') as HTMLInputElement).value;
       if (!name || toMinutes(end) <= toMinutes(start)) return;
       events.push({ id: crypto.randomUUID(), name, day, start, end, color });
       void setItem(EVENT_KEY, events);
       renderGrid();
-      // Switch to the added day in mobile view
-      setActiveTab(day);
-      document.getElementById('ev-name').value = '';
+      // Notify React mobile component
+      window.dispatchEvent(new CustomEvent('acm:events-updated'));
+      (document.getElementById('ev-name') as HTMLInputElement).value = '';
     });
 
     // ── deadlines ─────────────────────────────────────────────────────
-    function daysUntil(dateStr) {
+    function daysUntil(dateStr: string): number {
       const target = new Date(dateStr + 'T00:00:00').getTime();
-      const today  = new Date(); today.setHours(0,0,0,0);
+      const today  = new Date(); today.setHours(0, 0, 0, 0);
       return Math.ceil((target - today.getTime()) / 86_400_000);
     }
-    function countdownLabel(days) {
-      if (days < 0)  return `hace ${Math.abs(days)} día${Math.abs(days) === 1 ? '' : 's'}`;
+    function countdownLabel(days: number): string {
+      if (days < 0)   return `hace ${Math.abs(days)} día${Math.abs(days) === 1 ? '' : 's'}`;
       if (days === 0) return '¡hoy!';
       if (days === 1) return 'mañana';
       return `en ${days} días`;
     }
 
     function renderDeadlines() {
-      const list = document.getElementById('deadline-list');
+      const list = document.getElementById('deadline-list')!;
       list.innerHTML = '';
       const sorted = [...deadlines].sort((a, b) => a.date.localeCompare(b.date));
       if (sorted.length === 0) {
@@ -265,8 +203,8 @@ for (let h = 6; h < 22; h++) {
         return;
       }
       for (const d of sorted) {
-        const days    = daysUntil(d.date);
-        const isPast  = days < 0;
+        const days     = daysUntil(d.date);
+        const isPast   = days < 0;
         const isUrgent = days >= 0 && days <= 3;
         const li = document.createElement('li');
         li.className = 'deadline-item' + (isPast ? ' past' : '') + (isUrgent && !isPast ? ' urgent' : '');
@@ -278,7 +216,7 @@ for (let h = 6; h < 22; h++) {
           <span class="dl-countdown mono">${countdownLabel(days)}</span>
           <button class="dl-del" type="button" aria-label="Eliminar">✕</button>
         `;
-        li.querySelector('button').addEventListener('click', () => {
+        li.querySelector('button')!.addEventListener('click', () => {
           deadlines = deadlines.filter(x => x.id !== d.id);
           void setItem(DEADLINE_KEY, deadlines);
           renderDeadlines();
@@ -287,12 +225,12 @@ for (let h = 6; h < 22; h++) {
       }
     }
 
-    const dlForm = document.getElementById('deadline-form');
+    const dlForm = document.getElementById('deadline-form') as HTMLFormElement;
     dlForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const label = document.getElementById('deadline-label');
-      const date  = document.getElementById('deadline-date');
-      const time  = document.getElementById('deadline-time');
+      const label = document.getElementById('deadline-label') as HTMLInputElement;
+      const date  = document.getElementById('deadline-date')  as HTMLInputElement;
+      const time  = document.getElementById('deadline-time')  as HTMLInputElement;
       if (!label.value.trim() || !date.value) return;
       deadlines.push({ id: crypto.randomUUID(), label: label.value.trim(), date: date.value, time: time.value || undefined });
       void setItem(DEADLINE_KEY, deadlines);
@@ -302,15 +240,14 @@ for (let h = 6; h < 22; h++) {
 
     // ── init ──────────────────────────────────────────────────────────
     async function init() {
-      events    = await getItem(EVENT_KEY, []);
-      deadlines = await getItem(DEADLINE_KEY, []);
+      events    = await getItem<WeekEvent[]>(EVENT_KEY, []);
+      deadlines = await getItem<Deadline[]>(DEADLINE_KEY, []);
       renderGrid();
-      renderDayView();
       renderDeadlines();
     }
     init();
     window.addEventListener('acm:auth', (e) => {
-      if (e.detail?.authenticated) init();
+      if ((e as CustomEvent).detail?.authenticated) init();
     });
   </script>
 
@@ -319,44 +256,37 @@ for (let h = 6; h < 22; h++) {
     .intro h1 { font-size: 1.8rem; margin-bottom: 10px; }
     .intro p { color: var(--ink-dim); }
 
+    /* ── Visibility split ───────────────────────────────────────────── */
+    .mobile-only  { display: none; margin-bottom: 40px; }
+    .desktop-only { display: block; }
+    @media (max-width: 700px) {
+      .mobile-only  { display: block; }
+      .desktop-only { display: none; }
+      :global(.dl-del) { opacity: 1 !important; }
+    }
+
     /* ── Deadline form ──────────────────────────────────────────────── */
     .deadlines-section { margin-bottom: 40px; }
     .deadlines-section h2 { font-size: 1.2rem; margin-bottom: 6px; }
     .deadlines-sub { color: var(--ink-dim); font-size: 0.85rem; margin-bottom: 16px; }
 
     .deadline-form {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 16px;
-      margin-bottom: 20px;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 16px; margin-bottom: 20px;
     }
     .deadline-form input[type="text"] { width: 100%; }
-    .deadline-form-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+    .deadline-form-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .deadline-form-row input { flex: 1 1 130px; }
     .deadline-form-row .btn { flex-shrink: 0; }
 
     /* ── Event form ─────────────────────────────────────────────────── */
     .schedule-title { font-size: 1.2rem; margin: 0 0 16px; }
-
     .event-form {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 16px;
-      margin: 0 0 24px;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 16px; margin: 0 0 24px;
     }
     .event-form input[type="text"] { width: 100%; }
-    .event-form-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
+    .event-form-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .time-pair { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .time-sep { color: var(--ink-dim); font-size: 0.8rem; }
     #ev-color {
@@ -364,112 +294,20 @@ for (let h = 6; h < 22; h++) {
       border-radius: 6px; border: 1px solid var(--panel-line);
       background: none; cursor: pointer; flex-shrink: 0;
     }
-
-    /* ── Mobile day view ────────────────────────────────────────────── */
-    .day-view { display: none; margin-bottom: 40px; }
-
-    .day-tabs {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      margin-bottom: 16px;
-      scrollbar-width: none;
+    @media (max-width: 700px) {
+      .event-form-row { flex-direction: column; align-items: stretch; }
+      .event-form-row select, .event-form-row .btn { width: 100%; }
+      #ev-color { width: 44px; height: 44px; }
     }
-    .day-tabs::-webkit-scrollbar { display: none; }
-
-    .day-tab {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      padding: 10px 16px;
-      border-radius: 999px;
-      border: 1px solid var(--panel-line);
-      background: var(--void-2);
-      color: var(--ink-dim);
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-      touch-action: manipulation;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
-    }
-    .day-tab.active {
-      color: var(--void);
-      background: var(--telemetry);
-      border-color: var(--telemetry);
-      font-weight: 700;
-    }
-
-    .day-title-row { margin-bottom: 12px; }
-    .day-title-label {
-      font-size: 0.72rem;
-      color: var(--ink-dim);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .day-events { display: flex; flex-direction: column; gap: 10px; }
-    .day-empty { color: var(--ink-dim); font-size: 0.82rem; padding: 20px 0; text-align: center; }
-
-    .day-event-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 18px;
-      border: 1px solid var(--panel-line);
-      border-left: 4px solid;
-      border-radius: var(--radius-sm);
-      position: relative;
-    }
-    .day-event-time {
-      font-size: 0.72rem;
-      color: var(--ink-dim);
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .day-event-name {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: var(--ink);
-      flex: 1;
-      min-width: 0;
-    }
-    .day-event-del {
-      background: none;
-      border: none;
-      color: var(--ink-dim);
-      cursor: pointer;
-      font-size: 0.75rem;
-      padding: 8px;
-      border-radius: 6px;
-      touch-action: manipulation;
-      flex-shrink: 0;
-      min-width: 36px;
-      min-height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .day-event-del:active { color: var(--flame); }
 
     /* ── Desktop table ──────────────────────────────────────────────── */
-    .table-section { display: block; }
-    .table-wrap {
-      margin: 0 0 40px;
-      overflow-x: auto;
-      padding: 8px;
-    }
+    .table-wrap { margin: 0 0 40px; overflow-x: auto; padding: 8px; }
     table { border-collapse: collapse; width: 100%; min-width: 640px; }
     th, td { padding: 4px 8px; text-align: left; border: 1px solid var(--panel-line); }
     th { font-size: 0.68rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; background: var(--void-2); }
     .corner { color: var(--telemetry); }
     .hour-label { font-size: 0.65rem; color: var(--ink-dim); white-space: nowrap; width: 48px; }
-    .cell {
-      height: 28px; min-width: 90px;
-      vertical-align: top; position: relative;
-      transition: background 0.1s;
-    }
+    .cell { height: 28px; min-width: 90px; vertical-align: top; position: relative; transition: background 0.1s; }
     .cell:hover { background: rgba(255,255,255,0.03); }
 
     :global(.ev-label) {
@@ -483,36 +321,30 @@ for (let h = 6; h < 22; h++) {
       color: rgba(255,255,255,0.5); border-radius: 50%;
       width: 20px; height: 20px; font-size: 0.55rem;
       cursor: pointer; display: none;
-      align-items: center; justify-content: center; line-height: 1;
+      align-items: center; justify-content: center;
     }
     :global(.cell:hover .ev-del) { display: flex; }
     :global(.ev-del:hover) { background: rgba(0,0,0,0.6); color: #fff; }
 
     /* ── Deadline list ──────────────────────────────────────────────── */
-    .deadline-list {
-      list-style: none; padding: 0; margin: 0;
-      display: flex; flex-direction: column; gap: 10px;
-    }
+    .deadline-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
     :global(.deadline-item) {
-      display: flex; align-items: center; gap: 14px;
-      padding: 14px 16px;
-      background: var(--panel);
-      border: 1px solid var(--panel-line);
-      border-left: 3px solid var(--telemetry);
-      border-radius: var(--radius-sm);
+      display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+      background: var(--panel); border: 1px solid var(--panel-line);
+      border-left: 3px solid var(--telemetry); border-radius: var(--radius-sm);
     }
-    :global(.deadline-item.past) { opacity: 0.4; border-left-color: var(--panel-line); }
+    :global(.deadline-item.past)   { opacity: 0.4; border-left-color: var(--panel-line); }
     :global(.deadline-item.urgent) { border-left-color: var(--flame); background: rgba(255,107,53,0.06); }
     :global(.dl-left) { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
     :global(.dl-label) { font-size: 0.92rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    :global(.dl-meta) { font-size: 0.7rem; color: var(--ink-dim); }
+    :global(.dl-meta)  { font-size: 0.7rem; color: var(--ink-dim); }
     :global(.dl-countdown) {
       font-family: var(--font-mono); font-size: 0.7rem;
       color: var(--telemetry); background: rgba(95,212,208,0.1);
       padding: 3px 10px; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
     }
     :global(.deadline-item.urgent .dl-countdown) { color: var(--flame); background: rgba(255,107,53,0.15); }
-    :global(.deadline-item.past .dl-countdown) { color: var(--ink-dim); background: var(--void-2); }
+    :global(.deadline-item.past   .dl-countdown) { color: var(--ink-dim); background: var(--void-2); }
     :global(.dl-del) {
       background: none; border: none; color: var(--ink-dim); cursor: pointer;
       font-size: 0.7rem; border-radius: 4px; opacity: 0; transition: opacity 0.15s;
@@ -523,19 +355,68 @@ for (let h = 6; h < 22; h++) {
     :global(.dl-del:hover) { color: var(--flame); }
     .deadline-empty { color: var(--ink-dim); font-size: 0.8rem; padding: 8px 0; }
 
-    /* ── Responsive breakpoint ──────────────────────────────────────── */
-    @media (max-width: 700px) {
-      .day-view { display: block; }
-      .table-section { display: none; }
+    /* ── MobileSchedule React component styles ──────────────────────── */
+    :global(.ms-root) { display: flex; flex-direction: column; gap: 12px; }
 
-      /* Show dl-del always on touch */
-      :global(.dl-del) { opacity: 1; }
+    :global(.ms-tabs) {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+    :global(.ms-tabs::-webkit-scrollbar) { display: none; }
 
-      .event-form-row { flex-direction: column; align-items: stretch; }
-      .event-form-row select,
-      .event-form-row .btn { width: 100%; }
-      .time-pair { flex-wrap: wrap; }
-      #ev-color { width: 44px; height: 44px; }
+    :global(.ms-tab) {
+      font-family: var(--font-mono); font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 10px 16px; border-radius: 999px;
+      border: 1px solid var(--panel-line); background: var(--void-2);
+      color: var(--ink-dim); cursor: pointer; white-space: nowrap;
+      flex-shrink: 0; touch-action: manipulation;
+      position: relative;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    :global(.ms-tab--active) {
+      color: var(--void); background: var(--telemetry);
+      border-color: var(--telemetry); font-weight: 700;
+    }
+    :global(.ms-tab--today:not(.ms-tab--active)) { border-color: var(--ion); color: var(--ion); }
+    :global(.ms-today-dot) {
+      position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+      width: 4px; height: 4px; border-radius: 50%; background: currentColor;
+    }
+
+    :global(.ms-day-label) { display: flex; align-items: center; gap: 10px; }
+    :global(.ms-day-name) { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+    :global(.ms-today-badge) {
+      font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase;
+      background: rgba(78,168,255,0.15); color: var(--ion);
+      padding: 2px 8px; border-radius: 999px; letter-spacing: 0.06em;
+    }
+
+    :global(.ms-events) { display: flex; flex-direction: column; gap: 10px; }
+    :global(.ms-empty) { font-family: var(--font-mono); color: var(--ink-dim); font-size: 0.82rem; padding: 24px 0; text-align: center; }
+
+    :global(.ms-card) {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 18px; border: 1px solid var(--panel-line);
+      border-left: 4px solid; border-radius: var(--radius-sm);
+    }
+    :global(.ms-card-time) {
+      font-family: var(--font-mono); font-size: 0.72rem;
+      color: var(--ink-dim); white-space: nowrap; flex-shrink: 0;
+    }
+    :global(.ms-card-name) { font-size: 0.95rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
+    :global(.ms-card-del) {
+      background: none; border: none; color: var(--ink-dim); cursor: pointer;
+      touch-action: manipulation; flex-shrink: 0;
+      min-width: 40px; min-height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; border-radius: 6px;
+    }
+    :global(.ms-card-del:active) { color: var(--flame); }
+    :global(.ms-swipe-hint) {
+      font-family: var(--font-mono); font-size: 0.62rem;
+      color: var(--ink-dim); text-align: center;
+      opacity: 0.5; letter-spacing: 0.04em;
     }
   </style>
 </Layout>
