@@ -213,10 +213,14 @@ import Layout from '../layouts/Layout.astro';
       border: 1px solid var(--panel-line);
       color: var(--ink-dim);
       border-radius: 6px;
-      width: 26px;
-      height: 24px;
+      min-width: 36px;
+      min-height: 36px;
       font-size: 0.8rem;
       cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .mini-btn-del:hover { color: var(--flame); border-color: var(--flame); }
   </style>

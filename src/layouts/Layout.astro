@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Analytics from '@vercel/analytics/astro';
 
 interface Props {
   title: string;
@@ -21,7 +22,12 @@ const path = Astro.url.pathname;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="description" content="Centro de mando personal de Alexandra — misiones, horario y motivación." />
+    <meta name="theme-color" content="#4ea8ff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ACM" />
     <title>{title} · Centro de Mando</title>
   </head>
   <body>
@@ -44,7 +50,22 @@ const path = Astro.url.pathname;
           </nav>
           <button id="logout-btn" class="logout-btn mono hidden" type="button">Cerrar sesión</button>
         </div>
+        <button class="hamburger" id="hamburger-btn" aria-label="Abrir menú" aria-expanded="false" type="button">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
       </div>
+      <nav class="mobile-nav" id="mobile-nav" aria-label="Menú móvil" aria-hidden="true">
+        <div class="wrap mobile-nav-inner">
+          {nav.map((item) => (
+            <a href={item.href} class:list={['mobile-nav-link', { active: path === item.href }]}>
+              {item.label}
+            </a>
+          ))}
+          <button id="mobile-logout-btn" class="mobile-logout-btn mono hidden" type="button">Cerrar sesión</button>
+        </div>
+      </nav>
     </header>
 
     <div id="auth-gate" class="auth-gate hidden">
@@ -85,14 +106,33 @@ const path = Astro.url.pathname;
       import { supabase, isSupabaseConfigured } from '../lib/supabase';
       import { getItem, setItem } from '../lib/store';
 
-      const gate      = document.getElementById('auth-gate')!;
-      const content   = document.getElementById('app-content')!;
-      const logoutBtn = document.getElementById('logout-btn')!;
-      const form      = document.getElementById('auth-form') as HTMLFormElement;
-      const statusEl  = document.getElementById('auth-status')!;
-      const nameModal = document.getElementById('name-modal')!;
-      const nameForm  = document.getElementById('name-form') as HTMLFormElement;
-      const brandName = document.getElementById('brand-name')!;
+      const gate            = document.getElementById('auth-gate')!;
+      const content         = document.getElementById('app-content')!;
+      const logoutBtn       = document.getElementById('logout-btn')!;
+      const mobileLogoutBtn = document.getElementById('mobile-logout-btn')!;
+      const form            = document.getElementById('auth-form') as HTMLFormElement;
+      const statusEl        = document.getElementById('auth-status')!;
+      const nameModal       = document.getElementById('name-modal')!;
+      const nameForm        = document.getElementById('name-form') as HTMLFormElement;
+      const brandName       = document.getElementById('brand-name')!;
+
+      // Hamburger menu
+      const hamburgerBtn = document.getElementById('hamburger-btn')!;
+      const mobileNav    = document.getElementById('mobile-nav')!;
+      hamburgerBtn.addEventListener('click', () => {
+        const isOpen = mobileNav.classList.toggle('open');
+        hamburgerBtn.classList.toggle('open', isOpen);
+        hamburgerBtn.setAttribute('aria-expanded', String(isOpen));
+        mobileNav.setAttribute('aria-hidden', String(!isOpen));
+      });
+      mobileNav.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+          mobileNav.classList.remove('open');
+          hamburgerBtn.classList.remove('open');
+          hamburgerBtn.setAttribute('aria-expanded', 'false');
+          mobileNav.setAttribute('aria-hidden', 'true');
+        });
+      });
 
       async function loadAndSetName() {
         const profile = await getItem<{ name: string } | null>('acm.profile', null);
@@ -121,6 +161,7 @@ const path = Astro.url.pathname;
         gate.classList.add('hidden');
         content.classList.remove('hidden');
         logoutBtn.classList.remove('hidden');
+        mobileLogoutBtn.classList.remove('hidden');
         window.dispatchEvent(new CustomEvent('acm:auth', { detail: { authenticated: true } }));
         loadAndSetName();
       }
@@ -130,6 +171,7 @@ const path = Astro.url.pathname;
         gate.classList.remove('hidden');
         nameModal.classList.add('hidden');
         logoutBtn.classList.add('hidden');
+        mobileLogoutBtn.classList.add('hidden');
         brandName.textContent = 'Centro de Mando';
         if (message) statusEl.textContent = message;
         window.dispatchEvent(new CustomEvent('acm:auth', { detail: { authenticated: false } }));
@@ -193,9 +235,9 @@ const path = Astro.url.pathname;
           submitBtn.removeAttribute('disabled');
         });
 
-        logoutBtn.addEventListener('click', async () => {
-          await supabase.auth.signOut();
-        });
+        const signOut = async () => { await supabase.auth.signOut(); };
+        logoutBtn.addEventListener('click', signOut);
+        mobileLogoutBtn.addEventListener('click', signOut);
       }
     </script>
 
@@ -203,10 +245,12 @@ const path = Astro.url.pathname;
       <p class="mono footer-text">T-MINUS SIEMPRE · hecho con cariño, para que despegues cada día 🚀</p>
     </footer>
 
+    <Analytics />
+
     <style>
       .topbar {
         border-bottom: 1px solid var(--panel-line);
-        background: rgba(11, 18, 32, 0.75);
+        background: rgba(11, 18, 32, 0.92);
         backdrop-filter: blur(10px);
         position: sticky;
         top: 0;
@@ -220,7 +264,6 @@ const path = Astro.url.pathname;
         padding-top: 12px;
         padding-bottom: 12px;
         flex-wrap: nowrap;
-        overflow-x: auto;
       }
       .brand {
         display: flex;
@@ -277,6 +320,81 @@ const path = Astro.url.pathname;
         color: var(--telemetry);
         border-color: var(--panel-line);
         background: var(--panel);
+      }
+
+      /* Hamburger button — hidden on desktop */
+      .hamburger {
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        gap: 5px;
+        background: none;
+        border: 1px solid var(--panel-line);
+        border-radius: var(--radius-sm);
+        padding: 10px 11px;
+        cursor: pointer;
+        flex-shrink: 0;
+        touch-action: manipulation;
+      }
+      .hamburger span {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: var(--ink-dim);
+        transition: transform 0.22s ease, opacity 0.22s ease;
+      }
+      .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); background: var(--ink); }
+      .hamburger.open span:nth-child(2) { opacity: 0; }
+      .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); background: var(--ink); }
+
+      /* Mobile nav drawer — hidden by default */
+      .mobile-nav {
+        display: none;
+        overflow: hidden;
+        border-top: 1px solid var(--panel-line);
+      }
+      .mobile-nav.open { display: block; }
+      .mobile-nav-inner {
+        display: flex;
+        flex-direction: column;
+        padding-top: 8px;
+        padding-bottom: 16px;
+        gap: 2px;
+      }
+      .mobile-nav-link {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        text-decoration: none;
+        color: var(--ink-dim);
+        padding: 13px 4px;
+        border-bottom: 1px solid rgba(36, 49, 77, 0.5);
+        display: block;
+        touch-action: manipulation;
+      }
+      .mobile-nav-link:last-of-type { border-bottom: none; }
+      .mobile-nav-link.active { color: var(--telemetry); }
+      .mobile-logout-btn {
+        font-size: 0.7rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        background: none;
+        border: 1px solid var(--panel-line);
+        color: var(--ink-dim);
+        border-radius: var(--radius-sm);
+        padding: 12px 16px;
+        cursor: pointer;
+        margin-top: 10px;
+        width: 100%;
+        font-family: var(--font-mono);
+        touch-action: manipulation;
+      }
+      .mobile-logout-btn:hover { color: var(--flame); border-color: var(--flame); }
+
+      @media (max-width: 720px) {
+        .nav-end { display: none; }
+        .hamburger { display: flex; }
       }
       .page-eyebrow { padding-top: 28px; }
       .main {

@@ -49,6 +49,7 @@ for (let h = 6; h < 22; h++) {
     <button type="submit" class="btn btn-flame">Añadir</button>
   </form>
 
+  <p class="swipe-hint mono">← desliza para ver toda la semana →</p>
   <div class="table-wrap panel">
     <table id="schedule-table">
       <thead>
@@ -303,17 +304,19 @@ for (let h = 6; h < 22; h++) {
       border: none;
       color: rgba(255,255,255,0.5);
       border-radius: 50%;
-      width: 16px;
-      height: 16px;
+      width: 20px;
+      height: 20px;
       font-size: 0.55rem;
       cursor: pointer;
       display: none;
       align-items: center;
       justify-content: center;
       line-height: 1;
+      touch-action: manipulation;
     }
     :global(.cell:hover .ev-del) { display: flex; }
     :global(.ev-del:hover) { background: rgba(0,0,0,0.6); color: #fff; }
+    @media (pointer: coarse) { :global(.ev-del) { display: flex; } }
 
     .deadlines-section { margin-bottom: 40px; }
     .deadlines-section h2 { font-size: 1.2rem; margin-bottom: 6px; }
@@ -353,10 +356,20 @@ for (let h = 6; h < 22; h++) {
     :global(.dl-del) {
       background: none; border: none; color: var(--ink-dim); cursor: pointer;
       font-size: 0.7rem; padding: 4px; border-radius: 4px; opacity: 0; transition: opacity 0.15s;
+      touch-action: manipulation; min-width: 28px; min-height: 28px;
     }
     :global(.deadline-item:hover .dl-del) { opacity: 1; }
     :global(.dl-del:hover) { color: var(--flame); }
+    @media (pointer: coarse) { :global(.dl-del) { opacity: 1; } }
     .deadline-empty { color: var(--ink-dim); font-size: 0.8rem; padding: 8px 0; }
+    .swipe-hint {
+      display: none;
+      font-size: 0.68rem;
+      color: var(--ink-dim);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 700px) { .swipe-hint { display: block; } }
     .mini-btn {
       background: none;
       border: 1px solid var(--panel-line);

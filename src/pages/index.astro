@@ -128,7 +128,12 @@ import MissionPatch from '../components/MissionPatch.astro';
       margin-bottom: 24px;
     }
     .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    @media (max-width: 480px) {
+      .hero-actions { flex-direction: column; }
+      .hero-actions .btn { text-align: center; }
+    }
     .hero-patch { flex: 0 0 auto; }
+    @media (max-width: 480px) { .hero-patch { display: none; } }
 
     .readout { padding: 20px 24px; margin-bottom: 32px; }
     .readout-head {
