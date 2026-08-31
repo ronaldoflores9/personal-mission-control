@@ -93,11 +93,13 @@ for (let h = 6; h < 22; h++) {
     </div>
   </div>
 
-  <script define:vars={{ daysFull }}>
+  <script>
     import { getItem, setItem } from '../lib/store';
 
     const EVENT_KEY    = 'acm.weeklyEvents';
     const DEADLINE_KEY = 'acm.deadlines';
+
+    const daysFull = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
     let events    = [];
     let deadlines = [];
